@@ -8,8 +8,12 @@ Created on Mon Aug 24 21:14:50 2020
 import csv
 import json
 import googlemaps as gm
+import os
+import datetime
 
-with open(r'c:\users\duncan.anderson\tnc\config.json') as f:
+cwd = os.getcwd()
+print(cwd)
+with open(cwd+'\config.json') as f:
   config = json.load(f)
 
 class Node(object):
@@ -48,8 +52,8 @@ class Edge(object):
 def Load_Data():   
     nodeDict = {}
     edgeDict = {}
-    nodeObj = open(r"C:\Users\duncan.anderson\tnc\austin_sdb_node.txt")
-    netObj = open(r"C:\Users\duncan.anderson\tnc\austin_sdb_net.txt")
+    nodeObj = open(cwd+r'\austin_sdb_node.txt')
+    netObj = open(cwd+r'\austin_sdb_net.txt')
     node_Read = csv.reader(nodeObj, delimiter="\t")
     net_Read = csv.reader(netObj, delimiter="\t")
     for row in node_Read:
@@ -70,25 +74,26 @@ def Load_Data():
 def Google_travel_time(edgeDict):
     timetest = []
     gmaps = gm.Client(key=config['api_key'])
-    init_time = 1609480800 + 60*60*12 #1609480800
-    for edge in range(1,1000):
+    init_time = (datetime.datetime(2021,4,1,17,0) - datetime.datetime(1970,1,1,0,0)).total_seconds()
+    for edge in range(1,len(edgeDict)):
         #1609480800 seconds since 1/1/1970 UCT
         for t in range(0,1):
             result = gmaps.distance_matrix(str(edgeDict[edge].get_head()), str(edgeDict[edge].get_tail()),\
                                            mode='driving', departure_time=init_time + t*15*60) #["rows"][0]["elements"][0]["distance"]["value"]
-            edgeDict[edge].travel_time.append(\
-                    2.37 * \
-                    #meters per second to miles per hour
-                    result['rows'][0]['elements'][0]['distance']['value']/result['rows'][0]['elements'][0]['duration']['value'])
+            print(result) 
+            distance = result['rows'][0]['elements'][0]['distance']['value']
+            duration = result['rows'][0]['elements'][0]['duration']['value']
+            duration_in_traffic = result['rows'][0]['elements'][0]['duration_in_traffic']['value']
+            speed_mph = 2.37 * distance / (duration_in_traffic + 1 )
+            edgeDict[edge].travel_time.append(duration_in_traffic)
             #distance over time for rate (speed) is better congestion metric
             #pull rush hour time for all edges and look for slowest speed to find congestion and then test time series
             #we need to test time series because right now its returning flat values
-            timetest.append(result['rows'][0]['elements'][0]['duration']['value'])
-            print(t)
-            print(2.37*result['rows'][0]['elements'][0]['distance']['value']/result['rows'][0]['elements'][0]['duration']['value'])
+            timetest.append(speed_mph)
+            print(speed_mph)
     print(timetest)
     #for edge in edgeDict:
-    return result
+    return timetest
 (nodeDict, edgeDict) = Load_Data()
 print(str(edgeDict[1].get_head()))       
 result = Google_travel_time(edgeDict)
