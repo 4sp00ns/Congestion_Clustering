@@ -14,22 +14,26 @@ import numpy as np
 
 transformer = pyproj.Transformer.from_crs("epsg:2958", "epsg:4326")
 
-mydoc = minidom.parse(r'F:\Austin_Multimodal\revised_austin_plans\revised_austin_plans.xml')
-
-people = mydoc.getElementsByTagName('person')
-
-triplist = []
-for p in people:
-    action = p.getElementsByTagName('activity')
-    leg = p.getElementsByTagName('leg')
-    for aa in range(0,len(action)-1):
-        time = action[aa].getAttribute('end_time')
-        origin = str(transformer.transform(float(action[aa].getAttribute('x')), float(action[aa].getAttribute('y'))))
-        destination = str(transformer.transform(float(action[aa+1].getAttribute('x')), float(action[aa+1].getAttribute('y'))))
-        triplist.append([time,origin,destination])
-
-output = np.asarray(triplist)
-np.savetxt('ATXtrips.csv', output, delimiter=',')
+def get_trips():
+    tripdata = minidom.parse(r'F:\Austin_Multimodal\revised_austin_plans\revised_austin_plans.xml')
+    
+    people = tripdata.getElementsByTagName('person')
+    
+    triplist = []
+    for p in people:
+        action = p.getElementsByTagName('activity')
+        leg = p.getElementsByTagName('leg')
+        for aa in range(0,len(action)-1):
+            time = action[aa].getAttribute('end_time')
+            origin = str(transformer.transform(float(action[aa].getAttribute('x')), float(action[aa].getAttribute('y'))))
+            destination = str(transformer.transform(float(action[aa+1].getAttribute('x')), float(action[aa+1].getAttribute('y'))))
+            triplist.append([time,origin,destination])
+    
+    output = np.asarray(triplist)
+    np.savetxt('ATXtrips.csv', output, delimiter=',')
+    
+def get_nodes():
+    
 
 #with open(r'F:\Austin_Multimodal\testcsv.csv', 'w') as myfile:
 #    wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
