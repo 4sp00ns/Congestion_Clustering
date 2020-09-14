@@ -9,6 +9,7 @@ from xml.dom import minidom
 import csv
 import pyproj
 import numpy as np
+import networkx as nx
 
 
 transformer = pyproj.Transformer.from_crs("epsg:2958", "epsg:4326")
@@ -31,11 +32,32 @@ def get_trips():
     output = np.asarray(triplist)
     np.savetxt('ATXtrips.csv', output, delimiter=',')
     
+<<<<<<< Updated upstream
 def get_nodes():
     tripdata = minidom.parse(r'E:\Austin_Multimodal\austin_multimodalnetwork\austin_multimodalnetwork.xml')
     return tripdata
 
 get_nodes()
+=======
+def get_networktopo():
+    nodeout = {}
+    edgeout = {}
+    networkdata = minidom.parse(r'F:\Austin_Multimodal\austin_multimodalnetwork\austin_multimodalnetwork.xml')
+    nodes = xmlwork.getElementsByTagName('nodes')[0].getElementsByTagName('node')
+    links = xmlwork.getElementsByTagName('links')[0].getElementsByTagName('link')
+    for n in nodes:
+        nodeout[n.getAttribute('id')]= n
+    for l in links:
+        edgeout[(l.getAttribute('from'),l.getAttribute('to'))] = l
+    return (nodeout,edgeout)
+
+def create_network(nodes,links):
+    ATXgraph = nx.Graph()
+    ATXgraph.add_nodes_from(nodes.keys())
+    ATXgraph.add_edges_from(links.keys())
+
+(nodes,links) = get_networktopo()
+>>>>>>> Stashed changes
 #with open(r'F:\Austin_Multimodal\testcsv.csv', 'w') as myfile:
 #    wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
 #    wr.writerow(triplist)                
