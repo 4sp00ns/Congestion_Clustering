@@ -129,13 +129,28 @@ def shortestPath(Network, origin, destination):
     distance = nx.astar_path_length(Network,origin,destination)
     return (path, distance)
 
-def assignVehicle(vehicle,trip):
+def assignVehicle(vehicle,ride,enrouteList):
+    #check if origin PUDO has a vehicle, if so, assign
+    #if not, check enroute vehicles for rideshare
+    #if none, find available vehicle at adjacent pudo and relocate it (is this is a new event?)
     pass
 
-def findVehicle():
-    pass
+def enrouteCheck(ride, enrouteList,clusterDict):
+    #when a vehicle takes a ride, it posts a routelist
+    #check routelists for the nodes within the cluster
+        #for trips passing through the cluster, check if destination is within the clusters on the route
+        #if origin and destination are within route clusters, A* the vehicle to the origin PUDO for pickup
+            #delete from routelist
+            #use original departure time to calculate arrival time
+            #closer destination is first dropoff, may need to combine 2 A* here
+    pass            
+
 
 def masterEventHandler(event):
+    #arrivals
+    #relocates?
+    #ride requests
+    #checks the event type and calls the appropriate function to handle
     pass    
 def getNextEvent(schedule):
     time = min(schedule.keys())

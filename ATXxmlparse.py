@@ -6,7 +6,6 @@ Created on Tue Sep  8 10:05:04 2020
 """
 
 from xml.dom import minidom
-import utm
 import csv
 import pyproj
 import numpy as np
@@ -33,8 +32,10 @@ def get_trips():
     np.savetxt('ATXtrips.csv', output, delimiter=',')
     
 def get_nodes():
-    
+    tripdata = minidom.parse(r'E:\Austin_Multimodal\austin_multimodalnetwork\austin_multimodalnetwork.xml')
+    return tripdata
 
+get_nodes()
 #with open(r'F:\Austin_Multimodal\testcsv.csv', 'w') as myfile:
 #    wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
 #    wr.writerow(triplist)                

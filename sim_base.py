@@ -31,12 +31,14 @@ reports = {}
 #    events_df = pandas.DataFrame()
 #    permute_id = ''
     
-class Drone(object):
-    def __init__(self,home, charge_level):
+class Vehicle(object):
+    def __init__(self,home, location, charge_level):
         self.home = home
         self.charge_level = charge_level
     def get_charge_level(self):
         return self.charge_level
+    def get_location(self):
+        return self.location
     def get_home(self):
         return self.home
 
@@ -118,48 +120,36 @@ class Delivery(object):
     def get_queue_time(self):
         return self.queue_time
 
-def run_sim(run_id, permute, wander, Optimal, Weighted, permute_id, eventlog_id,num_drones):
+def run_sim(run_id, permute, permute_id, eventlog_id,num_drones):
     if eventlog_id == '':
         events_df = pandas.DataFrame()
     else:
         events_df = pandas.read_excel(r'C:\Users\duncan.anderson\Documents\reporting'+eventlog_id+r'.xlsx')
-    report_data = initialize(run_id, permute, wander, Optimal, Weighted, permute_id, eventlog_id, events_df, num_drones)
+    report_data = initialize(run_id, permute, permute_id, eventlog_id, events_df, num_drones)
     report_data.to_excel(r'c:\users\duncan.anderson\documents\REPORTING\reporting'+run_id+permute_id+'.xlsx')
     return report_data
 
-def initialize(run_id, permute, wander, Optimal, Weighted, permute_id, eventlog_id, events_df,num_drones):
+def initialize(run_id, permute, permute_id, eventlog_id, events_df,num_vehicles, PUDO_list):
     print('initializing')
     time =0
     stations = []
-    #create the zones
-    for x in range(len(zones_df)):
-        zones_df.loc[x, 'obj'] = Zone(zones_df.loc[x].ID, literal_eval(zones_df.loc[x].location), zones_df.loc[x].p_orig, zones_df.loc[x].lambda_dest)
-        #place the charging stations
-        #if zones_df.loc[x,'obj'].get_location() == (8,6):
-        #    zones_df.loc[x,'obj'].station = Charge_Station(1,(8,6),[],station_cap)
-        #    stations.append(zones_df.loc[x,'obj'].get_station())
-        if zones_df.loc[x,'obj'].get_location() == (8,3):
-            zones_df.loc[x,'obj'].station = Charge_Station(1,(8,3),[],station_cap)
-            stations.append(zones_df.loc[x,'obj'].get_station())
-        #if zones_df.loc[x,'obj'].get_location() == (5,1):
-        #    zones_df.loc[x,'obj'].station = Charge_Station(1,(5,1),[],station_cap)
-        #    stations.append(zones_df.loc[x,'obj'].get_station())
-        #if zones_df.loc[x,'obj'].get_location() == (2,2):
-        #    zones_df.loc[x,'obj'].station = Charge_Station(1,(2,2),[],station_cap)
-        #    stations.append(zones_df.loc[x,'obj'].get_station())
-        #if zones_df.loc[x,'obj'].get_location() == (2,7):
-        #    zones_df.loc[x,'obj'].station = Charge_Station(1,(2,7),[],station_cap)
-        #    stations.append(zones_df.loc[x,'obj'].get_station())
+    #create the stations
+        #function that loads the PUDO csv into station objects
+    
+    #create the vehicles
+    
 
     for i in range(replications):
-        schedule = []
+        #this conditional only required for stochastic replications
         
+        
+        schedule = []
         if permute is False:
             print('no existing schedule')
             schedule = create_schedule(None)
         else:
             schedule = create_schedule(events_df.loc[events_df['replication'] == i])
-        stations = reset(stations,schedule,Weighted,Optimal,num_drones,i,wander)
+        stations = reset(stations,schedule,num_drones,i)
         time = 0
         dlog = {}
         print('running replication',i, 'of permutation', run_id+permute_id)
@@ -171,7 +161,7 @@ def initialize(run_id, permute, wander, Optimal, Weighted, permute_id, eventlog_
             report_data = reporting(i, dlog, report_data,run_id+permute_id)
     return report_data
     
-def reset(stations, schedule,Weighted,Optimal,num_drones,i,wander):
+def reset(stations, schedule,num_drones,i):
     ###########WIPE DELIVERY RECORDS AND NEXT DELIVERIES FROM EACH ZONE############
     for i in zones_df.obj:
         i.completed_deliveries = []
@@ -181,51 +171,33 @@ def reset(stations, schedule,Weighted,Optimal,num_drones,i,wander):
         s.capacity = []
         
     ###########INITIALIZE DRONES###############
-    if Optimal is False:
-        if Weighted is False:
-            dps = int(num_drones/len(stations))
-            for s in stations:
-                #print('adding drones to station', s)
-                for j in range(dps):
-                    #print('drones per station',dps)
-                    s.capacity.append(Drone(s,100))
-        elif Weighted == True:
-            for d in schedule.values():
-                nearest = calc_best_station(d,stations,wander,Optimal)
-                #nearest = calc_nearest_station(stations,d.get_destination().get_location())
-                nearest.adjacencies += 1
 
-            for s in stations:
-                print('station @', s.get_location(), 'gets # drones', math.ceil(num_drones * (s.get_adjacencies()/maxdeliver)))
-                for c in range(math.ceil(num_drones * (s.get_adjacencies()/maxdeliver))):
-                    s.capacity.append(Drone(s,100))
-    elif Optimal is True:
-        
         #where N is the # of drones in the system, allocates drones according to the first N deliveries distribution
         #then for each station calculates the appropriate proportion of drones to home there for the next N timesteps
-        for d in schedule.keys():
+    for d in schedule.keys():
+        for s in stations:
+            s.demand[d] = 0
+        sched15 = {}
+        for d2 in schedule.keys():
+            if d2 < 15+d and d2+10>d:
+                sched15[d2] = schedule[d2]
+        for d3 in sched15.values():
             for s in stations:
-                s.demand[d] = 0
-            sched15 = {}
-            for d2 in schedule.keys():
-                if d2 < 15+d and d2+10>d:
-                    sched15[d2] = schedule[d2]
-            for d3 in sched15.values():
-                for s in stations:
-                    if calc_best_station(d3, stations, wander, Optimal) == s:
-                    #if calc_nearest_station(stations, d3.get_origin().get_location()) == s:
-                        #if d == min(schedule.keys()):
-                            #print('increasing demand at',s.get_location(),'by 1 at time',d,'total is now',s.get_demand()[d]+1)
-                        s.demand[d] += 1
-            if d == min(schedule.keys()):
-                for s in stations:
-                    print('station @', s.get_location(), 'gets # drones', int(num_drones* s.get_demand()[d]/len(sched15)))
-                    for dc in range(int(num_drones* s.get_demand()[d]/len(sched15))):
-                        s.capacity.append(Drone(s,100))
+                if calc_best_station(d3, stations, wander, Optimal) == s:
+                #if calc_nearest_station(stations, d3.get_origin().get_location()) == s:
+                    #if d == min(schedule.keys()):
+                        #print('increasing demand at',s.get_location(),'by 1 at time',d,'total is now',s.get_demand()[d]+1)
+                    s.demand[d] += 1
+        if d == min(schedule.keys()):
+            for s in stations:
+                print('station @', s.get_location(), 'gets # drones', int(num_drones* s.get_demand()[d]/len(sched15)))
+                for dc in range(int(num_drones* s.get_demand()[d]/len(sched15))):
+                    s.capacity.append(Drone(s,100))
             
     return stations
     
 def calc_nearest_station(stations,coord):
+    #for a set of coordinates (coord) returns the closest PUDO
     closest = {}
     d_x = coord[0]
     d_y = coord[1]
@@ -234,16 +206,6 @@ def calc_nearest_station(stations,coord):
         s_y = s.get_location()[1]
         closest[s] = numpy.sqrt((s_x-d_x)**2+(s_y-d_y)**2)
     return min(closest, key=closest.get)
-
-def calc_optimal_home(stations,order_time):
-    ratio = {}
-    for s in stations:
-        if len(s.get_capacity()) == 0:
-            cap = 1
-        else:
-            cap = len(s.get_capacity())
-        ratio[s] = s.get_demand()[order_time]-cap
-    return max(ratio, key=ratio.get)
 
 def calc_best_station(delivery, stations, wander, Optimal):
     travel_distance = {}
@@ -272,22 +234,16 @@ def assign_origin():
     return zones_df.loc[t,'obj']
 
 def create_schedule(events_df):
+    
+    ###LOOKS FOR AN EXISTING SCHEDULE OF EVENTS
     schedule = {}
-    if events_df is None:
-        print('no preexisting events, generating initial events for each zone')
-        for i in zones_df.obj:
-            schedule = gen_delivery(i,0,schedule,None)
-        for i in zones_df.obj:
-            schedule[i.get_next_deliver().get_order_time()] = i.get_next_deliver()
-    else:
-        print('event schedule preexisting')
-        for e in events_df.index:
-            o_z = zones_df.loc[zones_df['location'] == events_df.loc[e].origin.replace(" ","")].obj.values[0]
-            d_z = zones_df.loc[zones_df['location'] == events_df.loc[e].destination.replace(" ","")].obj.values[0]
-            schedule = gen_delivery(d_z,None,schedule,(events_df.loc[e][0],o_z,events_df.loc[e].pickup,events_df.loc[e].dropoff))
+
     return schedule
 
 def gen_delivery(destination, time, schedule,setval):
+    
+    ###TURNS A SCHEDULED EVENT INTO A DELIVERY######
+    
     #print(d.get_ID(),d.get_lambda())
     if setval is None:
         #print(destination.get_lambda())
@@ -300,6 +256,7 @@ def gen_delivery(destination, time, schedule,setval):
     return schedule        
 
 def sim_step(schedule, stations, oldtime, dlog,wander,Optimal,permute):
+    ####EVENT DRIVEN SIMULATION SO THE CURRENT TIME IS THE MINIMUM TIME OBJECT IN THE SCHEDULE####
     time = min(schedule.keys())
     delta_t = time - oldtime
     charge_drones(stations,delta_t)
@@ -332,7 +289,7 @@ def charge_drones(stations,delta_t):
         for d in s.get_capacity():
             d.charge_level = min(d.charge_level+(charge_rate*delta_t),100)
                 
-def dispatch(delivery, stations,wander,Optimal):
+def dispatch(delivery, stations):
     #print('dispatching a drone')
     travel_distance = {}
     return_distance = {}
