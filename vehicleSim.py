@@ -133,9 +133,10 @@ def assignVehicle(vehicle,ride,enrouteList):
     #check if origin PUDO has a vehicle, if so, assign
     #if not, check enroute vehicles for rideshare
     #if none, find available vehicle at adjacent pudo and relocate it (is this is a new event?)
+    #add the trip keyed by a tuple of origin and destination times to the enrouteDict
     pass
 
-def enrouteCheck(ride, enrouteList,clusterDict):
+def enrouteCheck(ride, enrouteDict,clusterDict):
     #when a vehicle takes a ride, it posts a routelist
     #check routelists for the nodes within the cluster
         #for trips passing through the cluster, check if destination is within the clusters on the route
@@ -145,7 +146,14 @@ def enrouteCheck(ride, enrouteList,clusterDict):
             #closer destination is first dropoff, may need to combine 2 A* here
     pass            
 
-
+def findVehicleEnroute(trip, time):
+    #calculate current time - start time
+    #walk along the link list in the trip summing travel times until you exceed the time passed
+    pass
+def cleanEnroute(enrouteDict, time):
+    #walk through tuple keys in enrouteDict removing entries where the second item in the tuple is prior to the current time (trip ended)
+    #perhaps this could be a stricter assumption to improve computational time
+    pass
 def masterEventHandler(event):
     #arrivals
     #relocates?
