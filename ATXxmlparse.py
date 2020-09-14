@@ -6,15 +6,17 @@ Created on Tue Sep  8 10:05:04 2020
 """
 
 from xml.dom import minidom
+import utm
 import csv
 import pyproj
 import numpy as np
 import networkx as nx
 
-
-transformer = pyproj.Transformer.from_crs("epsg:2958", "epsg:4326")
-
-def get_trips():
+def createTransformer():
+    transformer = pyproj.Transformer.from_crs("epsg:2958", "epsg:4326")
+    return transformer
+def get_trips(path):
+    transformer = createTransformer()
     tripdata = minidom.parse(r'F:\Austin_Multimodal\revised_austin_plans\revised_austin_plans.xml')
     
     people = tripdata.getElementsByTagName('person')
@@ -29,22 +31,16 @@ def get_trips():
             destination = str(transformer.transform(float(action[aa+1].getAttribute('x')), float(action[aa+1].getAttribute('y'))))
             triplist.append([time,origin,destination])
     
-    output = np.asarray(triplist)
-    np.savetxt('ATXtrips.csv', output, delimiter=',')
+    #output = np.asarray(triplist)
+    #np.savetxt('ATXtrips.csv', output, delimiter=',')
+    return triplist
     
-<<<<<<< Updated upstream
-def get_nodes():
-    tripdata = minidom.parse(r'E:\Austin_Multimodal\austin_multimodalnetwork\austin_multimodalnetwork.xml')
-    return tripdata
-
-get_nodes()
-=======
-def get_networktopo():
+def getNetworkTopo(path):
     nodeout = {}
     edgeout = {}
-    networkdata = minidom.parse(r'F:\Austin_Multimodal\austin_multimodalnetwork\austin_multimodalnetwork.xml')
-    nodes = xmlwork.getElementsByTagName('nodes')[0].getElementsByTagName('node')
-    links = xmlwork.getElementsByTagName('links')[0].getElementsByTagName('link')
+    networkData = minidom.parse(r'F:\Austin_Multimodal\austin_multimodalnetwork\austin_multimodalnetwork.xml')
+    nodes = networkData.getElementsByTagName('nodes')[0].getElementsByTagName('node')
+    links = networkData.getElementsByTagName('links')[0].getElementsByTagName('link')
     for n in nodes:
         nodeout[n.getAttribute('id')]= n
     for l in links:
@@ -55,9 +51,9 @@ def create_network(nodes,links):
     ATXgraph = nx.Graph()
     ATXgraph.add_nodes_from(nodes.keys())
     ATXgraph.add_edges_from(links.keys())
+    return ATXgraph
 
-(nodes,links) = get_networktopo()
->>>>>>> Stashed changes
+
 #with open(r'F:\Austin_Multimodal\testcsv.csv', 'w') as myfile:
 #    wr = csv.writer(myfile, quoting=csv.QUOTE_ALL)
 #    wr.writerow(triplist)                

@@ -6,7 +6,9 @@ Created on Sun Sep 13 22:26:52 2020
 """
 
 import networkx as nx
-
+import ATXxmlparse
+#import pudo_work
+import os
 
 class Vehicle(object):
     def __init__(self, ID, rider, position, route, objective, charge_level, seats, bid_price, energy_rate, actioncount):
@@ -99,13 +101,21 @@ class PUDO(object):
             #TOTAL TRAVEL TIME
             #TOTAL RIDESHARE DISTANCE
             #TOTAL DISTANCE
+def getConfig():
+    cwd = os.getcwd()
+    with open(cwd+r'\config.json') as f:
+        config = json.load(f)            
+    return config        
 def readData():
     #load trip data
     #load pudo locations
     #load clusters
     #load network nodes and edges
     pass
-    return (trips, PUDOList, nodeList, edgeList, clusterDict)            
+    tripList = ATXxmlparse.get_trips(config['tripXML'])
+    (nodeList,edgeList) = ATXxmlparse.getNetworkTopo(config['networkXML'])
+    return (nodeList, edgeList) #(trips, PUDOList, nodeList, edgeList, clusterDict)
+           
 def createNetwork(nodeList, edgeList):
     Network = nx.Graph()
     Network.add_nodes_from(nodeList)
@@ -167,3 +177,7 @@ def getNextEvent(schedule):
 def addEvent(schedule):
     pass
 
+config = getConfig()
+(n,e) = readData() 
+network = createNetwork(n,e)
+test = shortestPath(network, n[0],n[1])
