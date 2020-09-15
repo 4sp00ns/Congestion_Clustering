@@ -15,7 +15,7 @@ import networkx as nx
 def createTransformer():
     transformer = pyproj.Transformer.from_crs("epsg:2958", "epsg:4326")
     return transformer
-def get_trips(path):
+def getTrips(path):
     transformer = createTransformer()
     tripdata = minidom.parse(r'F:\Austin_Multimodal\revised_austin_plans\revised_austin_plans.xml')
     
@@ -27,9 +27,9 @@ def get_trips(path):
         leg = p.getElementsByTagName('leg')
         for aa in range(0,len(action)-1):
             time = action[aa].getAttribute('end_time')
-            origin = str(transformer.transform(float(action[aa].getAttribute('x')), float(action[aa].getAttribute('y'))))
-            destination = str(transformer.transform(float(action[aa+1].getAttribute('x')), float(action[aa+1].getAttribute('y'))))
-            triplist.append([time,origin,destination])
+            origin_lat, origin_long = transformer.transform(float(action[aa].getAttribute('x')), float(action[aa].getAttribute('y')))
+            dest_lat, dest_long = transformer.transform(float(action[aa+1].getAttribute('x')), float(action[aa+1].getAttribute('y')))
+            triplist.append([time,origin_lat,origin_long,dest_lat,dest_long])
     
     #output = np.asarray(triplist)
     #np.savetxt('ATXtrips.csv', output, delimiter=',')

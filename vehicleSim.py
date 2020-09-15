@@ -112,9 +112,10 @@ def readData():
     #load clusters
     #load network nodes and edges
     pass
-    tripList = ATXxmlparse.get_trips(config['tripXML'])
+    ####this is a list of lists, each sublist is [time,o(lat,long),d(lat,long)]
+    tripList = ATXxmlparse.getTrips(config['tripXML'])
     (nodeList,edgeList) = ATXxmlparse.getNetworkTopo(config['networkXML'])
-    return (nodeList, edgeList) #(trips, PUDOList, nodeList, edgeList, clusterDict)
+    return (triplist, nodeList, edgeList) #(trips, PUDOList, nodeList, edgeList, clusterDict)
            
 def createNetwork(nodeList, edgeList):
     Network = nx.Graph()
@@ -178,6 +179,6 @@ def addEvent(schedule):
     pass
 
 config = getConfig()
-(n,e) = readData() 
+(t,n,e) = readData() 
 network = createNetwork(n,e)
 test = shortestPath(network, n[0],n[1])
