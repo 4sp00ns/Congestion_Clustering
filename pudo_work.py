@@ -7,12 +7,18 @@ Created on Thu Apr 30 12:32:42 2020
 import numpy as np
 import ATXxmlparse
 import sklearn.cluster as c
+import json
+import pandas as pd
+
 #classpath = ":".join(pyspark.classpath_jars())
 def create_spark():
     spark = SparkSession.builder.getOrCreate()
     return spark
 def getTripData(path):
     tripData = ATXxmlparse.getTrips(path)
+    for t in tripData:
+        (t[1], t[2]) = coordToNetwork((t[1],t[2]),nodes)
+        (t[3], t[4]) = coordToNetwork((t[3],t[4]),nodes)
     return tripData
 def allOD(tripData):
     allOD = []
@@ -32,6 +38,28 @@ def run_kmeans(trip_locations):
     #np.savetxt('testout_weight.csv', txtout, delimiter=',')
     return k_means_data
 
-def centroid_2_location(latlon, loc_df):
-    loc_array = np.array(locations_df.collect())
+def createClusterDict(clusterData, trip_data, nodes):
+    clusterDict = {}
+    for i in range(len(trip_data)):
+        clusterDict[(trip_data[i][0],trip_data[i][1])] = clusterData[i]
+    df = pd.DataFrame.from_dict(clusterDict, orient="index")
+    df.to_csv("clusterDict.csv")
+    #with open("clusterDict.json", "w") as outfile:  
+        #json.dump(clusterDict, outfile)
+    #for n in nodes.keys():
+    #for c in ClusterDict.keys():
+    #    if nodes[n].get_coords_tup == c:
+    #        print('match', nodes[n].get_coords_tup(), c)
+    #        nodes[n].cluster = clusterDict[c]
+    return clusterDict
+#(nodes,edges) = ATXxmlparse.getNetworkTopo('')
+def coordToNetwork(coord,nodes):
+    minVal = 999
+    for n in nodes.keys():
+        nCoord = nodes[n].get_coords_tup()
+        distance = np.sqrt((nCoord[0]-coord[0])**2 + (nCoord[1] - coord[1])**2)
+        if distance < minVal:
+            minVal = distance
+            minNode = n
+    return nodes[minNode].get_coords_tup()
     #for pudo in latlon:

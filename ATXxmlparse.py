@@ -12,9 +12,41 @@ import pyproj
 import numpy as np
 import networkx as nx
 
+class Node(object):
+    def __init__(self, ID, lat, long, cluster):
+        self.ID = ID
+        self.lat = lat
+        self.long = long
+        self.cluster = cluster
+    def get_lat(self):
+        return self.lat
+    def get_long(self):
+        return self.long
+    def get_cluster(self):
+        return self.cluster
+    def get_coords_tup(self):
+        return (self.lat,self.long)
+    def get_coords_str(self):
+        return (str(self.lat)+','+str(self.long))
+    
+class Edge(object):
+    def __init__(self, ID, head, tail, distance, travel_time):
+        self.ID = ID
+        self.head = head
+        self.tail = tail
+        self.distance = distance
+        self.travel_time = travel_time
+    def get_head(self):
+        return self.lat
+    def get_tail(self):
+        return self.long
+    def get_distance(self):
+        return self.cluster
+    def get_travel_time(self):
+        return self.travel_time
+
 def createTransformer():
-    transformer = pyproj.Transformer.from_crs("epsg:2958", "epsg:4326")
-    return transformer
+    return pyproj.Transformer.from_crs("epsg:2958", "epsg:4326")
 def getTrips(path):
     transformer = createTransformer()
     tripdata = minidom.parse(r'F:\Austin_Multimodal\revised_austin_plans\revised_austin_plans.xml')
@@ -27,24 +59,33 @@ def getTrips(path):
         leg = p.getElementsByTagName('leg')
         for aa in range(0,len(action)-1):
             time = action[aa].getAttribute('end_time')
-            origin_lat, origin_long = transformer.transform(float(action[aa].getAttribute('x')), float(action[aa].getAttribute('y')))
-            dest_lat, dest_long = transformer.transform(float(action[aa+1].getAttribute('x')), float(action[aa+1].getAttribute('y')))
+            (origin_lat, origin_long) = transformer.transform(float(action[aa].getAttribute('x')), float(action[aa].getAttribute('y')))
+            (dest_lat, dest_long) = transformer.transform(float(action[aa+1].getAttribute('x')), float(action[aa+1].getAttribute('y')))
             triplist.append([time,origin_lat,origin_long,dest_lat,dest_long])
     
     #output = np.asarray(triplist)
     #np.savetxt('ATXtrips.csv', output, delimiter=',')
     return triplist
-    
+   
 def getNetworkTopo(path):
+    transformer = createTransformer()
     nodeout = {}
     edgeout = {}
     networkData = minidom.parse(r'F:\Austin_Multimodal\austin_multimodalnetwork\austin_multimodalnetwork.xml')
     nodes = networkData.getElementsByTagName('nodes')[0].getElementsByTagName('node')
     links = networkData.getElementsByTagName('links')[0].getElementsByTagName('link')
     for n in nodes:
-        nodeout[n.getAttribute('id')]= n
+        coords = transformer.transform(float(n.getAttribute('x')), float(n.getAttribute('y')))
+        nodeout[n.getAttribute('id')]= Node(n.getAttribute('id')\
+                                           ,coords[0]\
+                                           ,coords[1]\
+                                           ,0)
     for l in links:
-        edgeout[(l.getAttribute('from'),l.getAttribute('to'))] = l
+        edgeout[(l.getAttribute('from'),l.getAttribute('to'))] = Edge(l.getAttribute('id')\
+                                                                     ,l.getAttribute('from')\
+                                                                     ,l.getAttribute('to')\
+                                                                     ,l.getAttribute('length')\
+                                                                     ,[])
     return (nodeout,edgeout)
 
 def create_network(nodes,links):
