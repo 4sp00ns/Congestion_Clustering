@@ -1,0 +1,9 @@
+K Means variables (latitude, longitude, and weighting parameter) are all normalized on a euclidean ball. Normalizing 
+
+One of the limitations of the kmeans clustering used to develop these clusters is that it ignores the structure of the network in attempting to identify communities of nodes. while kmeans on GIS coordinates is able to consider raw euclidean distances between nodes, often these distances do a poor job of representing travel distances between nodes, which can lead to nodes being assigned to clusters they are not connected to, or require substantial travel time to arrive at. Nodes on either side of a major highway may be clustered together despite the challenge of travelling between them.
+
+For this reason, clustering algorithms like Louvain and Leiden that consider the structure of the network are more likely to produce well connected communities. 
+
+Congestion is a critical component of PUDO placement. TNC's that currently utilize PUDOs most often implement them to limit vehicle travel into and out of congested areas. In Manhattan Uber implements PUDOs on street corners to avoid vehicles travelling on small, one way, or residential roads. After hailing a ride, users are told to travel to a nearby street corner. These locations typically have available curbside space or pulloff areas where waiting drivers are less likely to contribute to congestion.
+
+In this study congestion is simulated by replacing the 'length' parameter of each edge in the network with a travel time parameter. Travel times are collected from the google maps API at hourly intervals. An additional leiden clustering is done with a congestion coefficient, calculated as the greatest travel time identified during a 24 hour period divided by the minimum travel time.
