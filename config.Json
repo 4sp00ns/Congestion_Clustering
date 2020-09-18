@@ -2,5 +2,6 @@
 "api_key": "AIzaSyDMxuloTDGdgp6drgMBPTDHk1GbDu-ZWDc",
 "tripXML": "F:\\Austin_Multimodal\\revised_austin_plans\\revised_austin_plans.xml",
 "networkXML":"F:\\Austin_Multimodal\\austin_multimodalnetwork\\austin_multimodalnetwork.xml",
-"ridesharing":"no"
+"ridesharing":"no",
+"numvehicles":1
 }

@@ -6,7 +6,6 @@ Created on Tue Sep  8 10:05:04 2020
 """
 
 from xml.dom import minidom
-import utm
 import csv
 import pyproj
 import numpy as np
