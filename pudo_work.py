@@ -18,7 +18,43 @@ import pandas as pd
 ###run kmeans[1] thru clusterdict
 ###convert kmeans[0] to PUDO list (brute force network match)
 #classpath = ":".join(pyspark.classpath_jars())
-def create_spark():
+
+#def master():
+#tripData = ATXxmlparse.getTrips('')
+#(nodes,edges) = ATXxmlparse.getNetworkTopo('')
+#CoordMatchTrips = coordinateMatchTrips(tripData)
+#nodedTripList = nodedTripList(CoordMatchTrips)
+#allOD = allOD(CoordMatchTrips)
+#[centroids, clusters, score] = run_kmeans(allOD)
+#clusterDict = createClusterDict(cluster Data,allOD,nodes)
+#PUDOlist = PUDOtoNetwork(centroids, nodes)
+
+
+def dictIndexCoords(nodes):
+    rndDict = {}
+    truncDict = {}
+    for n in nodes.keys():
+        lat = nodes[n].get_lat()
+        rnd = round(lat,2)
+        trunc = float(str(lat)[5:])
+        rndDict[rnd] = []
+        truncDict[trunc] = []
+    for n in nodes.keys():
+        for n in nodes.keys():
+            lat = nodes[n].get_lat()
+            rnd = round(lat,2)
+            trunc = float(str(lat)[5:])
+            rndDict[rnd] = [n.get_coords_tup()]
+            truncDict[trunc] = []
+            
+        #for n in nodelist:
+        #nodedict[round(n[0],3)] = []
+        #for n in nodelist:
+        #rnd = round(n[0],3)
+        #for n in nodelist:
+        #rnd = round(n[0],3)
+        #nodedict[rnd].append(n)
+        #def create_spark():
     spark = SparkSession.builder.getOrCreate()
     return spark
 def getTripData(path):
@@ -104,21 +140,28 @@ def bruteCoord(coord, nodes):
     #for pudo in latlon:
 def nodedTripList(tdata):
     nodedTrips = []
+    cDict = {}
     i=0
     if len(tdata[0]) == 6:
         i=1
+    for n in nodes.keys():
+        cDict[nodes[n].get_coords_tup()] = nodes[n].get_ID()
     for t in tdata:
-        for n in nodes.keys():
-            if nodes[n].get_lat() == t[1+i] and nodes[n].get_long() == t[2+i]:
-                print('origin match')
-                for nn in nodes.keys():
-                    if nodes[nn].get_lat() == t[3+i] and nodes[nn].get_long() == t[4+i]:
-                        print('destination match')
-                        nodedTrips.append([t[0], nodes[n].get_ID(), nodes[nn].get_ID()])
+        ocoord = (t[1],t[2])
+        dcoord = (t[3],t[4])
+        nodedTrips.append([t[0],cDict[ocoord],cDict[dcoord]])
+#    for t in tdata:
+#        for n in nodes.keys():
+#            if nodes[n].get_lat() == t[1+i] and nodes[n].get_long() == t[2+i]:
+#                print('origin match')
+#                for nn in nodes.keys():
+#                    if nodes[nn].get_lat() == t[3+i] and nodes[nn].get_long() == t[4+i]:
+#                        print('destination match')
+#                        nodedTrips.append([t[0], nodes[n].get_ID(), nodes[nn].get_ID()])
                     
     return nodedTrips
 
-def convertTrips(trips):
+def coordinateMatchTrips(trips):
     x=0
     for t in trips:
         #print(t)                    
@@ -128,3 +171,8 @@ def convertTrips(trips):
         (t[1], t[2]) = coordToNetwork((t[1],t[2]),nodedict, rnddict)
         (t[3], t[4]) = coordToNetwork((t[3],t[4]),nodedict, rnddict)
     return trips
+
+#tripData = ATXxmlparse.getTrips('')
+#(nodes,edges) = ATXxmlparse.getNetworkTopo('')
+#CoordMatchTrips = coordinateMatchTrips(tripData)
+#nodedTripList = nodedTripList(CoordMatchTrips)
