@@ -50,8 +50,14 @@ def createTransformer():
     return pyproj.Transformer.from_crs("epsg:2958", "epsg:4326")
 def getTrips(path):
     transformer = createTransformer()
-    tripdata = minidom.parse(r'F:\Austin_Multimodal\revised_austin_plans\revised_austin_plans.xml')
-    
+    try:
+        tripdata = minidom.parse(r'F:\Austin_Multimodal\revised_austin_plans\revised_austin_plans.xml')
+    except:
+        pass
+    try:
+        tripdata = minidom.parse(r'D:\Austin_Multimodal\revised_austin_plans\revised_austin_plans.xml')
+    except:
+        pass
     people = tripdata.getElementsByTagName('person')
     
     triplist = []
@@ -72,7 +78,14 @@ def getNetworkTopo(path):
     transformer = createTransformer()
     nodeout = {}
     edgeout = {}
-    networkData = minidom.parse(r'F:\Austin_Multimodal\austin_multimodalnetwork\austin_multimodalnetwork.xml')
+    try:
+        networkData = minidom.parse(r'F:\Austin_Multimodal\austin_multimodalnetwork\austin_multimodalnetwork.xml')
+    except:
+        pass
+    try:
+        networkData = minidom.parse(r'D:\Austin_Multimodal\austin_multimodalnetwork\austin_multimodalnetwork.xml')
+    except:
+        pass
     nodes = networkData.getElementsByTagName('nodes')[0].getElementsByTagName('node')
     links = networkData.getElementsByTagName('links')[0].getElementsByTagName('link')
     for n in nodes:
@@ -82,7 +95,7 @@ def getNetworkTopo(path):
                                            ,coords[1]\
                                            ,0)
     for l in links:
-        edgeout[(l.getAttribute('from'),l.getAttribute('to'))] = Edge(l.getAttribute('id')\
+        edgeout[(l.getAttribute('from'),l.getAttribute('to'),l.getAttribute('length'))] = Edge(l.getAttribute('id')\
                                                                      ,l.getAttribute('from')\
                                                                      ,l.getAttribute('to')\
                                                                      ,l.getAttribute('length')\
