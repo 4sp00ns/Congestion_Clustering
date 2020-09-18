@@ -150,7 +150,7 @@ def readData():
     #load network nodes and edges
     pass
     ####this is a list of lists, each sublist is [time,o(lat,long),d(lat,long)]
-    tripList = pd.read_csv('tripdata_noded.csv').values.tolist()
+    tripList = pd.read_csv('nodedTripList.csv').values.tolist()
     clusterDict = pd.read_csv('clusterDict.csv').values.tolist()
     PUDOlist = pd.read_csv('network_PUDOs.csv').values.tolist()
     (nodeList,edgeList) = ATXxmlparse.getNetworkTopo(config['networkXML'])
@@ -164,12 +164,15 @@ def createNetwork(nodeList, edgeList):
 def buildPUDO(PUDOList, clusterDict):
     PUDOs = []
     for p in PUDOList:
-        PUDOs.append(PUDO(p[o]), clusterDict[p[0]],10)
+        PUDOs.append(PUDO(p[o]), clusterDict[p[0]],[])
 def createSchedule():
     pass
     
 def generateVehicles(vehicleCount, PUDOs):
-    return PUDOs
+    for numV in range(int(config['numvehicles'])):
+        pass
+    
+    return vehicleList, PUDOs
 
 
 def findClosest(clusterDict, position):
