@@ -9,8 +9,6 @@ import networkx as nx
 import ATXxmlparse
 #import pudo_work
 import os
-import json
-import pandas as pd
 
 class Vehicle(object):
     def __init__(self, ID, rider, position, route, objective, charge_level, seats, bid_price, energy_rate, actioncount):
@@ -154,48 +152,32 @@ def readData():
     ####this is a list of lists, each sublist is [time,o(lat,long),d(lat,long)]
     tripList = pd.read_csv('nodedTripList.csv').values.tolist()
     clusterDict = pd.read_csv('clusterDict.csv').values.tolist()
-    PUDOList = pd.read_csv('network_PUDOs.csv').values.tolist()
-    (nodeDict,edgeDict) = ATXxmlparse.getNetworkTopo(config['networkXML'])
-    return (tripList, nodeDict, edgeDict,PUDOList,clusterDict) #(trips, PUDOList, nodeList, edgeList, clusterDict)
+    PUDOlist = pd.read_csv('network_PUDOs.csv').values.tolist()
+    (nodeList,edgeList) = ATXxmlparse.getNetworkTopo(config['networkXML'])
+    return (tripList, nodeList, edgeList,PUDOlist,clusterDict) #(trips, PUDOList, nodeList, edgeList, clusterDict)
            
-def createNetwork(nodeDict, edgeDict):
+def createNetwork(nodeList, edgeList):
     Network = nx.Graph()
-    Network.add_nodes_from(nodeDict.keys())
-    for e in edgeDict.keys():
-        Network.add_edge(e[0],e[1],weight=float(e[2]))
+    Network.add_nodes_from(nodeList)
+    Network.add_edges_from(edgeList)
     return Network
 def buildPUDO(PUDOList, clusterDict):
     PUDOs = []
     for p in PUDOList:
-        PUDOs.append(PUDO(p[o]), clusterDict[p[0]],[])
-def createSchedule(tripList):
-    #    def __init__(self, ID, hail_time, origin, destination, oPUDO, dPUDO):
-    schedule={}
-    for t in tripList:
-        schedule[t[1]] = Ride(t[0],t[1],t[2],t[3],noneType,noneType)
-        
+        PUDOs.append(PUDO(p[o]), clusterDict[p[0]],10)
+def createSchedule():
     pass
-def clusterAdjacencies(edgeDict,clusterDict):
-    clusterList = []
-    for e in edgeDict.keys():
-        clusterList.append((clusterDict[e[0]],clusterDict[e[1]]))
-    toFromSet = set(clusterList)
-    return toFromSet
-def generateVehicles(vehicleCount, PUDOs):
-    for numV in range(int(config['numvehicles'])):
-        pass
     
-    return vehicleList, PUDOs
+def generateVehicles(vehicleCount, PUDOs):
+    return PUDOs
 
 
-def findCluster(clusterDict, position):
+def findClosest(clusterDict, position):
     return clusterDict[position]
-def findPUDO(position):
-    pass
 
 def shortestPath(Network, origin, destination):
-    path = nx.astar_path(Network,origin,destination,weight='weight')
-    distance = nx.astar_path_length(Network,origin,destination, weight='weight')
+    path = nx.astar_path(Network,origin,destination,weight='distance')
+    distance = nx.astar_path_length(Network,origin,destination)
     return (path, distance)
 
 def assignVehicle(vehicle,ride,enrouteList):
@@ -236,7 +218,7 @@ def getNextEvent(schedule):
 def addEvent(schedule):
     pass
 
-#config = getConfig()
-#(tripList,nodeDict,edgeDict,PUDOlist,clusterDict) = readData() 
-#network = createNetwork(nodeDict,edgeDict)
+config = getConfig()
+(tripList,nodeDict,edgeDict,PUDOlist,clusterDict) = readData() 
+network = createNetwork(n,e)
 #test = shortestPath(network, n[0],n[1])
