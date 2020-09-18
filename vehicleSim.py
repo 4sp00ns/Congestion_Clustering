@@ -60,6 +60,43 @@ class PUDO(object):
         self.node = node
         self.cluster = cluster
         self.capacity = capacity
+        
+class Node(object):
+    def __init__(self, ID, lat, long, cluster,PUDO):
+        self.ID = ID
+        self.lat = lat
+        self.long = long
+        self.cluster = cluster
+        self.PUDO = PUDO
+    def get_ID(self):
+        return self.ID
+    def get_lat(self):
+        return self.lat
+    def get_long(self):
+        return self.long
+    def get_cluster(self):
+        return self.cluster
+    def get_coords_tup(self):
+        return (self.lat,self.long)
+    def get_coords_str(self):
+        return (str(self.lat)+','+str(self.long))
+    
+class Edge(object):
+    def __init__(self, ID, head, tail, distance, travel_time):
+        self.ID = ID
+        self.head = head
+        self.tail = tail
+        self.distance = distance
+        self.travel_time = travel_time
+    def get_head(self):
+        return self.lat
+    def get_tail(self):
+        return self.long
+    def get_distance(self):
+        return self.cluster
+    def get_travel_time(self):
+        return self.travel_time
+
 
 
 
@@ -113,18 +150,21 @@ def readData():
     #load network nodes and edges
     pass
     ####this is a list of lists, each sublist is [time,o(lat,long),d(lat,long)]
-    tripList = ATXxmlparse.getTrips(config['tripXML'])
+    tripList = pd.read_csv('tripdata_noded.csv').values.tolist()
+    clusterDict = pd.read_csv('clusterDict.csv').values.tolist()
+    PUDOlist = pd.read_csv('network_PUDOs.csv').values.tolist()
     (nodeList,edgeList) = ATXxmlparse.getNetworkTopo(config['networkXML'])
-    return (triplist, nodeList, edgeList) #(trips, PUDOList, nodeList, edgeList, clusterDict)
+    return (tripList, nodeList, edgeList,PUDOlist,clusterDict) #(trips, PUDOList, nodeList, edgeList, clusterDict)
            
 def createNetwork(nodeList, edgeList):
     Network = nx.Graph()
     Network.add_nodes_from(nodeList)
     Network.add_edges_from(edgeList)
     return Network
-def buildPUDO(PUDOList):
-    pass
-    
+def buildPUDO(PUDOList, clusterDict):
+    PUDOs = []
+    for p in PUDOList:
+        PUDOs.append(PUDO(p[o]), clusterDict[p[0]],10)
 def createSchedule():
     pass
     
@@ -179,6 +219,6 @@ def addEvent(schedule):
     pass
 
 config = getConfig()
-(t,n,e) = readData() 
+(tripList,nodeDict,edgeDict,PUDOlist,clusterDict) = readData() 
 network = createNetwork(n,e)
-test = shortestPath(network, n[0],n[1])
+#test = shortestPath(network, n[0],n[1])

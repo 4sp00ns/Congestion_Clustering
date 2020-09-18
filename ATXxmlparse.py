@@ -18,6 +18,8 @@ class Node(object):
         self.lat = lat
         self.long = long
         self.cluster = cluster
+    def get_ID(self):
+        return self.ID
     def get_lat(self):
         return self.lat
     def get_long(self):
