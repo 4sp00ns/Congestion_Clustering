@@ -7,7 +7,7 @@ Created on Thu Apr 30 12:32:42 2020
 import numpy as np
 import ATXxmlparse
 import sklearn.cluster as c
-import json
+#import json
 import pandas as pd
 
 
@@ -177,6 +177,6 @@ def coordinateMatchTrips(trips):
     return trips
 
 #tripData = ATXxmlparse.getTrips('')
-#(nodes,edges) = ATXxmlparse.getNetworkTopo('')
+(nodes,edges) = ATXxmlparse.getNetworkTopo('')
 #CoordMatchTrips = coordinateMatchTrips(tripData)
 #nodedTripList = nodedTripList(CoordMatchTrips)

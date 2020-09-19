@@ -150,10 +150,12 @@ def readData():
     #load pudo locations
     #load clusters
     #load network nodes and edges
-    pass
+    clusterDict = {}
     ####this is a list of lists, each sublist is [time,o(lat,long),d(lat,long)]
     tripList = pd.read_csv('nodedTripList.csv').values.tolist()
-    clusterDict = pd.read_csv('clusterDict.csv').values.tolist()
+    clusterList = pd.read_csv('clusterDict.csv').values.tolist()
+    for c in clusterList:
+        clusterDict[c[0]] = c[1]
     PUDOList = pd.read_csv('network_PUDOs.csv').values.tolist()
     (nodeDict,edgeDict) = ATXxmlparse.getNetworkTopo(config['networkXML'])
     return (tripList, nodeDict, edgeDict,PUDOList,clusterDict) #(trips, PUDOList, nodeList, edgeList, clusterDict)
@@ -167,7 +169,7 @@ def createNetwork(nodeDict, edgeDict):
 def buildPUDO(PUDOList, clusterDict):
     PUDOs = []
     for p in PUDOList:
-        PUDOs.append(PUDO(p[o]), clusterDict[p[0]],[])
+        PUDOs.append(PUDO(p[o], clusterDict[p[0]],[]))
 def createSchedule(tripList):
     #    def __init__(self, ID, hail_time, origin, destination, oPUDO, dPUDO):
     schedule={}
@@ -175,23 +177,25 @@ def createSchedule(tripList):
         schedule[t[1]] = Ride(t[0],t[1],t[2],t[3],noneType,noneType)
         
     pass
-def clusterAdjacencies(edgeDict,clusterDict):
+def genClusterAdjacencies(edgeDict,clusterDict):
     clusterList = []
     for e in edgeDict.keys():
+        #print(e)
         clusterList.append((clusterDict[e[0]],clusterDict[e[1]]))
     toFromSet = set(clusterList)
     return toFromSet
 def generateVehicles(vehicleCount, PUDOs):
     for numV in range(int(config['numvehicles'])):
         pass
-    
+
     return vehicleList, PUDOs
 
 
-def findCluster(clusterDict, position):
-    return clusterDict[position]
-def findPUDO(position):
-    pass
+def findCluster(clusterDict, node):
+    return clusterDict[node]
+def findPUDO(node):
+    for p in PUDOlist:
+        pass
 
 def shortestPath(Network, origin, destination):
     path = nx.astar_path(Network,origin,destination,weight='weight')
@@ -231,9 +235,11 @@ def masterEventHandler(event):
     pass    
 def getNextEvent(schedule):
     time = min(schedule.keys())
+    delta_t = time - oldtime
+    charge_drones(stations,delta_t)
     event = schedule.pop(time)
     return event
-def addEvent(schedule):
+def addEvent(time, typschedule):
     pass
 
 #config = getConfig()

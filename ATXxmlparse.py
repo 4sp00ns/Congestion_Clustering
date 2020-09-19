@@ -10,6 +10,7 @@ import csv
 import pyproj
 import numpy as np
 import networkx as nx
+import pandas as pd
 
 class Node(object):
     def __init__(self, ID, lat, long, cluster):
@@ -100,6 +101,10 @@ def getNetworkTopo(path):
                                                                      ,l.getAttribute('to')\
                                                                      ,l.getAttribute('length')\
                                                                      ,[])
+    df = pd.DataFrame.from_dict(nodeout, orient="index")
+    df.to_csv("nodeDict.csv")
+    df = pd.DataFrame.from_dict(edgeout, orient="index")
+    df.to_csv("edgeDict.csv")
     return (nodeout,edgeout)
 
 def create_network(nodes,links):
