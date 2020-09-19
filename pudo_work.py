@@ -90,7 +90,7 @@ def createClusterDict(clusterData, allOD, nodes):
         cDict[nodes[n].get_coords_tup()] = nodes[n].get_ID()
     for i in range(len(allOD)):
         #print(i)
-        clusterDict[(allOD[i][0],allOD[i][1])] = clusterData[i]
+        #clusterDict[(allOD[i][0],allOD[i][1])] = clusterData[i]
         clusterDict[cDict[(allOD[i][0],allOD[i][1])]] = clusterData[i]
     df = pd.DataFrame.from_dict(clusterDict, orient="index")
     df.to_csv("clusterDict.csv")
