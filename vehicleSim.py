@@ -140,6 +140,10 @@ class Edge(object):
             #TOTAL TRAVEL TIME
             #TOTAL RIDESHARE DISTANCE
             #TOTAL DISTANCE
+            
+#############################################
+##########INITIALIZATION FUNCTIONS###########
+#############################################
 def getConfig():
     cwd = os.getcwd()
     with open(cwd+r'\config.json') as f:
@@ -169,33 +173,56 @@ def createNetwork(nodeDict, edgeDict):
 def buildPUDO(PUDOList, clusterDict):
     PUDOs = []
     for p in PUDOList:
-        PUDOs.append(PUDO(p[o], clusterDict[p[0]],[]))
+        #PUDOs.append(PUDO(p[o], clusterDict[p[0]],[]))
+    return PUDOs
+        
 def createSchedule(tripList):
     #    def __init__(self, ID, hail_time, origin, destination, oPUDO, dPUDO):
     schedule={}
     for t in tripList:
         schedule[t[1]] = Ride(t[0],t[1],t[2],t[3],noneType,noneType)
-        
-    pass
+    return schedule
+
 def genClusterAdjacencies(edgeDict,clusterDict):
     clusterList = []
+    adjDict = {}
     for e in edgeDict.keys():
         #print(e)
         clusterList.append((clusterDict[e[0]],clusterDict[e[1]]))
-    toFromSet = set(clusterList)
-    return toFromSet
-def generateVehicles(vehicleCount, PUDOs):
+    uniqAdj = list(set(clusterList))
+    for u in uniqAdj:
+        adjDict[u[0]] = []
+    for u in uniqAdj:
+        adjDict[u[0]].append(u[1])
+    return adjDict
+
+def generateVehicles(vehicleCount, PUDOlist):
     for numV in range(int(config['numvehicles'])):
         pass
-
-    return vehicleList, PUDOs
-
+    randct = np.random.randint(0, len(PUDOlist)
+    PUDOlist[randct]
+    return vehicleList, PUDOlist
+ 
+##############################################
+######SIMULATION OPERATION FUNCTIONS##########
+##############################################
 
 def findCluster(clusterDict, node):
     return clusterDict[node]
-def findPUDO(node):
-    for p in PUDOlist:
-        pass
+def findPUDO(node, PUDOList):
+    nearbyPUDOs = []
+    cluster = findCluster(clusterDict, node)
+    adjClusters = adjDict[cluster]
+    for p in PUDOList:
+        if clusterDict[p[1]] in adjClusters:
+            nearbyPUDOs.append(p)
+    minDist = 999
+    for n in nearbyPUDOs:
+        dist = shortestpath(network,node.get_ID(), n[1])[1]
+        if dist < minDist:
+            minPUDO = n[1]
+            minDist = dist
+    return minPUDO
 
 def shortestPath(Network, origin, destination):
     path = nx.astar_path(Network,origin,destination,weight='weight')
@@ -224,7 +251,8 @@ def findVehicleEnroute(trip, time):
     #walk along the link list in the trip summing travel times until you exceed the time passed
     pass
 def cleanEnroute(enrouteDict, time):
-    #walk through tuple keys in enrouteDict removing entries where the second item in the tuple is prior to the current time (trip ended)
+    #walk through tuple keys in enrouteDict removing entries where the second item 
+    #in the tuple is prior to the current time (trip ended)
     #perhaps this could be a stricter assumption to improve computational time
     pass
 def masterEventHandler(event):
@@ -235,11 +263,13 @@ def masterEventHandler(event):
     pass    
 def getNextEvent(schedule):
     time = min(schedule.keys())
-    delta_t = time - oldtime
-    charge_drones(stations,delta_t)
+    #delta_t = time - oldtime
     event = schedule.pop(time)
     return event
 def addEvent(time, typschedule):
+    pass
+
+def simMaster():
     pass
 
 #config = getConfig()
