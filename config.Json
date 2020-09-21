@@ -3,5 +3,6 @@
 "tripXML": "F:\\Austin_Multimodal\\revised_austin_plans\\revised_austin_plans.xml",
 "networkXML":"F:\\Austin_Multimodal\\austin_multimodalnetwork\\austin_multimodalnetwork.xml",
 "ridesharing":"no",
-"numvehicles":1
+"numvehicles":1,
+"numtrips":10
 }
