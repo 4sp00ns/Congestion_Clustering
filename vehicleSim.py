@@ -11,7 +11,7 @@ import ATXxmlparse
 import os
 import json
 import pandas as pd
-from datetime import datetime
+import datetime as dt
 
 #class Vehicle(object):
 #    def __init__(self, ID, rider, position, route, objective, charge_level, seats, bid_price, energy_rate, actioncount):
@@ -47,7 +47,8 @@ class Ride(object):
         self.destination = destination
         self.oPUDO  = oPUDO
         self.dPUDO = dPUDO
-        self.arrival_time = hail_time
+        self.arrival_time = 0
+        self.route = []
     def get_ID(self):
         return self.ID
     def get_hail_time(self):
@@ -58,6 +59,12 @@ class Ride(object):
         return self.origin
     def get_destination(self):
         return self.destination
+    def get_oPUDO(self):
+        return self.oPUDO
+    def get_dPUDO(self):
+        return self.dPUDO
+    def get_route(self):
+        return self.route
     def __str__(self):
         return self.origin + ',' + self.destination
     def __repr__(self):
@@ -68,6 +75,12 @@ class PUDO(object):
         self.node = node
         self.cluster = cluster
         self.capacity = capacity
+    def get_node(self):
+        return self.node
+    def get_cluster(self):
+        return self.cluster
+    def get_capacity(self):
+        return self.capacity
         
 class Node(object):
     def __init__(self, ID, lat, long, cluster):
@@ -75,6 +88,7 @@ class Node(object):
         self.lat = lat
         self.long = long
         self.cluster = cluster
+        self.PUDO = 0
     def get_ID(self):
         return self.ID
     def get_lat(self):
@@ -171,57 +185,71 @@ def readData():
     #load pudo locations
     #load clusters
     #load network nodes and edges
-    clusterDict = {}
     ####this is a list of lists, each sublist is [time,o(lat,long),d(lat,long)]
     tripList = pd.read_csv('nodedTripList.csv').values.tolist()
     clusterList = pd.read_csv('clusterDict.csv').values.tolist()
-    for c in clusterList:
-        clusterDict[c[0]] = c[1]
-    PUDOList = pd.read_csv('network_PUDOs.csv').values.tolist()
-    (nodeDict,edgeDict) = ATXxmlparse.getNetworkTopo(config['networkXML'])
-    return (tripList, nodeDict, edgeDict,PUDOList,clusterDict) #(trips, PUDOList, nodeList, edgeList, clusterDict)
-def createDataStructures():
-    ATXNetwork = createNetwork(nodeDict,edgeDict)
-    clusterDict['3640042034'] = 43
-    clusterDict['151437669'] = 43
-    adjDict = getClusterAdjacencies(edgeDict, clusterDict)
-    PUDOs, nodeDict = buildPUDOs(PUDOList, clusterDict, nodeDict)
     
-def createNetwork(nodeDict, edgeDict):
-    Network = nx.Graph()
-    Network.add_nodes_from(nodeDict.keys())
+    PUDOList = pd.read_csv('network_PUDOs.csv').values.tolist()
+    global nodeDict, edgeDict
+    (nodeDict,edgeDict) = ATXxmlparse.getNetworkTopo(config['networkXML'])
+    for c in clusterList:
+        nodeDict[c[0]].cluster = c[1]
+    return (tripList, PUDOList) #(trips, PUDOList, nodeList, edgeList, clusterDict)
+
+def createDataStructures(PUDOList,tripList):
+    createNetwork()
+    nodeDict['3640042034'].cluster = 43
+    nodeDict['151437669'].cluster = 43
+    global adjDict, PUDOs
+    adjDict = getClusterAdjacencies()
+    PUDOs = buildPUDOs(PUDOList)
+    schedule = createSchedule(tripList)
+    return PUDOs, schedule
+    
+def createNetwork():
+    global ATXnet
+    ATXnet = nx.Graph()
+    ATXnet.add_nodes_from(nodeDict.keys())
     for e in edgeDict.keys():
-        Network.add_edge(e[0],e[1],weight=float(e[2]))
-    return Network
-def buildPUDOs(PUDOList, clusterDict, nodeDict):
+        ATXnet.add_edge(e[0],e[1],weight=float(e[2]))
+    #return ATXnet
+def buildPUDOs(PUDOList):
     PUDOs = {}
     for p in PUDOList:
-        nodeDict[p[1]].PUDO = PUDO(p[1], clusterDict[p[0]],[])
-        PUDOs[p[1]] = nodeDict[p[1]]
+        station = PUDO(nodeDict[p[1]], nodeDict[p[1]].get_cluster(),5)
+        nodeDict[p[1]].PUDO = station
+        PUDOs[p[1]] = station
         #PUDOs.append(PUDO(p[o], clusterDict[p[0]],[]))
-    return PUDOs, nodeDict
+    return PUDOs
 
-def generateVehicles(vehicleCount, PUDOlist):
+def generateVehicles(vehicleCount, PUDOs):
     for numV in range(int(config['numvehicles'])):
-        pass
-    randct = np.random.randint(0, len(PUDOlist))
-    PUDOlist[randct]
-    return vehicleList, PUDOlist
+        PUDOs
+        numpy.random.choice(PUDOs)
+    return PUDOs
         
 def createSchedule(tripList):
     #    def __init__(self, ID, hail_time, origin, destination, oPUDO, dPUDO):
     schedule={}
     for t in tripList[:config['numtrips']]:
-        eTime = datetime.strptime(t[1], '%H:%M:%S')
-        schedule[eTime] = Event(eTime, 'Ride', Ride(t[0],t[1],t[2],t[3],findPUDO(t[2], PUDOList),findPUDO(t[3], PUDOList)))
+        eTime = dt.datetime.strptime(t[1], '%H:%M:%S')
+        schedule[eTime] = Event(eTime, \
+                                'Ride',\
+                                Ride(t[0],\
+                                     eTime,\
+                                     t[2],\
+                                     t[3],\
+                                     findPUDO(nodeDict[t[2]]),\
+                                     findPUDO(nodeDict[t[3]])))
     return schedule
 
-def getClusterAdjacencies(edgeDict,clusterDict):
+def getClusterAdjacencies():
     clusterList = []
+    global adjDict
     adjDict = {}
     for e in edgeDict.keys():
         #print(e)
-        clusterList.append((clusterDict[e[0]],clusterDict[e[1]]))
+        clusterList.append((nodeDict[e[0]].get_cluster(),nodeDict[e[1]].get_cluster()))
     uniqAdj = list(set(clusterList))
     for u in uniqAdj:
         adjDict[u[0]] = []
@@ -235,43 +263,56 @@ def getClusterAdjacencies(edgeDict,clusterDict):
 ######SIMULATION OPERATION FUNCTIONS##########
 ##############################################
 
-def findCluster(clusterDict, node):
-    return clusterDict[node]
-def findPUDO(node, PUDOList):
+#def findCluster(clusterDict, node):
+#    return clusterDict[node]
+def findPUDO(node):
     nearbyPUDOs = []
-    cluster = findCluster(clusterDict, node)
-    adjClusters = adjDict[cluster]
-    for p in PUDOList:
-        if clusterDict[p[1]] in adjClusters:
+    #cluster = findCluster(clusterDict, node)
+    adjClusters = adjDict[node.get_cluster()]
+    for p in PUDOs.keys():
+        if PUDOs[p].get_cluster() in adjClusters:
             nearbyPUDOs.append(p)
-    minDist = 999
-    minPUDO = nearbyPUDOs[0][1]
+    minDist = 99999
+    minPUDO = nearbyPUDOs[0]
     for n in nearbyPUDOs:
-        dist = shortestPath(ATXNetwork,node, n[1])[1]
+        dist = shortestPath(node.get_ID(), n)[1]
         if dist < minDist:
-            minPUDO = n[1]
+            minPUDO = PUDOs[n]
             minDist = dist
     return minPUDO
 
-def shortestPath(Network, origin, destination):
-    path = nx.astar_path(Network,origin,destination,weight='weight')
-    distance = nx.astar_path_length(Network,origin,destination, weight='weight')
+def shortestPath(origin, destination):
+    path = nx.astar_path(ATXnet,origin,destination,weight='weight')
+    distance = nx.astar_path_length(ATXnet,origin,destination, weight='weight')
     return (path, distance)
 
-def assignVehicle(PUDOs, ride,enrouteDict):
-    oPUDO = PUDOs[ride.get_oPUDO()]
-    if len(oPUDO.get_capacity())>0:
-        vehicle = oPUDO.get_capacity()[0]
-        oPUDO.capacity = oPUDO.capacity[1:]
+def assignVehicle(ride): #,enrouteDict):
+    oPUDO = ride.get_oPUDO()
+    if oPUDO.get_capacity()>0:
+        print('reducing PUDO capacity by 1 at' + oPUDO.get_node().get_ID())
+        oPUDO.capacity = oPUDO.capacity-1
     #check if origin PUDO has a vehicle, if so, assign
     #if not, check enroute vehicles for rideshare
     #if none, find available vehicle at adjacent pudo and relocate it (is this is a new event?)
     #add the trip keyed by a tuple of origin and destination times to the enrouteDict
     else:
-        enrouteCheck(ride, enrouteDict, clusterDict)
-    return 
+        print(oPUDO.get_node().get_ID())
+        enrouteCheck(ride, enrouteDict) 
 
-def enrouteCheck(ride, enrouteDict,clusterDict):
+def enrouteCheck(ride, enrouteDict):
+    oCluster = ride.get_origin().get_cluster()
+    dCluster = ride.get_destination().get_cluster()
+    for route in enrouteDict.keys():
+        elapsed = route - ride.get_hail_time()
+        adjclusters = []
+        timesum = 0
+        ####this doesnt work because we dont have travel time, we have length
+        for pos in range(len(enrouteDict[route])-1):
+            timesum+= edgeDict[(enrouteDict[route][pos],enrouteDict[route][pos+1])]
+            adjClusters.append(adjDict[ride.get_origin().get_cluster()])
+        if oCluster in adjClusters and dCluster in adjClusters:
+            #time - key value = elapsed time
+            #step
     #when a vehicle takes a ride, it posts a routelist
     #check routelists for the nodes within the cluster
         #for trips passing through the cluster, check if destination is within the clusters on the route
@@ -279,7 +320,8 @@ def enrouteCheck(ride, enrouteDict,clusterDict):
             #delete from routelist
             #use original departure time to calculate arrival time
             #closer destination is first dropoff, may need to combine 2 A* here
-    pass            
+            pass
+    return vnode            
 
 def findVehicleEnroute(trip, time):
     #calculate current time - start time
@@ -290,33 +332,45 @@ def cleanEnroute(enrouteDict, time):
     #in the tuple is prior to the current time (trip ended)
     #perhaps this could be a stricter assumption to improve computational time
     pass
-def masterEventHandler(event):
+def masterEventHandler(event, schedule):
     #arrivals
-    if event.get_eType() == 'arrival':
+    if event.get_eType() == 'Arrival':
+        event.get_eObj.get_destination().get_PUDO().capacity +=1
+        enrouteDict.pop(event.get_eObj.get_hail_time())
         pass
         #add vehicle to destination PUDO capacity
         #log data from ride
     #relocates?
     #ride requests
-    if event.get_eType() == 'ride':
-        event.get_eObj().vehicle = assignVehicle(ride,enrouteList)
-        travel_time = 1
-        event.get_eObj().arrival_time = currTime + travel_time
-        schedule[currTime+travel_time] = Event(currTime + travel_time, 'arrival',ride)
+    if event.get_eType() == 'Ride':
+        ride = event.get_eObj()
+        path = shortestPath(ride.get_origin(), ride.get_destination())
+        ride.route = path[0]
+        assignVehicle(ride)#,enrouteList)
+        #enrouteDict[ride.get_hail_time()] = ride.get_route()
+        ride.arrival_time = ride.get_hail_time()+dt.timedelta(seconds = path[1])
+        schedule[ride.get_arrival_time()] = Event(ride.get_arrival_time(), 'arrival',ride)
+        #event.get_eObj().arrival_time = currTime + travel_time
+        #schedule[currTime+travel_time] = Event(currTime + travel_time, 'arrival',ride)
         #add vehicle to enroute
-    pass    
+    return schedule   
 def getNextEvent(schedule):
-    currTime = min(schedule.keys())
-    delta_t = currTime - oldTime
+    time = min(schedule.keys())
+    #delta_t = currTime - oldTime
     event = schedule.pop(time)
-    return event, delta_t
+    return event#, delta_t
 def addEvent(time, eventType, schedule):
     schedule
 
 def simMaster():
+    global config
+    config = getConfig()
+    (tripList,PUDOList) = readData()
+    PUDOs, schedule = createDataStructures(PUDOList, tripList)
     while len(schedule) > 0:
-        event, delta_t = getNextEvent(schedule)
-        event = masterEventHandler(event)
+        event = getNextEvent(schedule)
+        print(event.get_eTime(), event.get_eType())
+        schedule = masterEventHandler(event, schedule)
     
     
     pass
