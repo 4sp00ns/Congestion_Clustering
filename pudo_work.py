@@ -177,6 +177,6 @@ def coordinateMatchTrips(trips):
     return trips
 
 #tripData = ATXxmlparse.getTrips('')
-(nodes,edges) = ATXxmlparse.getNetworkTopo('')
+#(nodes,edges) = ATXxmlparse.getNetworkTopo('')
 #CoordMatchTrips = coordinateMatchTrips(tripData)
 #nodedTripList = nodedTripList(CoordMatchTrips)

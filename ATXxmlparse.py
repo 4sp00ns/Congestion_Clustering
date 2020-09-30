@@ -32,20 +32,35 @@ class Node(object):
         return (str(self.lat)+','+str(self.long))
     
 class Edge(object):
-    def __init__(self, ID, head, tail, distance, travel_time):
+    def __init__(self, ID, tail, head, capacity, length, fft, b, exponent, speed):
         self.ID = ID
         self.head = head
         self.tail = tail
-        self.distance = distance
-        self.travel_time = travel_time
+        self.capacity = capacity
+        self.length = length
+        self.fft = fft
+        self.b = b
+        self.exponent = exponent
+        self.speed = speed
+        self.congested_speed = fft
     def get_head(self):
         return self.head
     def get_tail(self):
         return self.tail
-    def get_distance(self):
-        return self.cluster
-    def get_travel_time(self):
-        return self.travel_time
+    def get_capacity(self):
+        return self.capacity
+    def get_length(self):
+        return self.length
+    def get_fft(self):
+        return self.fft
+    def get_b(self):
+        return self.b
+    def get_exponent(self):
+        return self.exponent
+    def get_speed(self):
+        return self.speed
+    def get_congested_speed(self):
+        return self.congested_speed
 
 def createTransformer():
     return pyproj.Transformer.from_crs("epsg:2958", "epsg:4326")
@@ -106,6 +121,23 @@ def getNetworkTopo(path):
     df = pd.DataFrame.from_dict(edgeout, orient="index")
     df.to_csv("edgeDict.csv")
     return (nodeout,edgeout)
+
+def getSDBNetworkTopo():
+    nodeout = {}
+    edgeout = {}
+    import os
+    cwd = os.getcwd()
+    with open('Austin_sdb_net.txt') as networkFile:
+        fileLines = networkFile.read().splitlines()[7:]
+        for line in fileLines:
+            data = line.split()
+            edgeout[data[0],data[1]] = Edge((data[0],data[1]), data[0], data[1], data[2], data[3], data[4], data[5], data[6], data[7])
+    with open('Austin_sdb_node.txt') as nodeFile:
+        fileLines = nodeFile.read().splitlines()[1:]
+        for line in fileLines:
+            data = line.split()
+            nodeout[data[0]] = Node(data[0], int(data[1])/1000000, int(data[2])/1000000, 0)
+    return (nodeout, edgeout)
 
 def create_network(nodes,links):
     ATXgraph = nx.Graph()
