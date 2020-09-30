@@ -39,9 +39,9 @@ class Edge(object):
         self.distance = distance
         self.travel_time = travel_time
     def get_head(self):
-        return self.lat
+        return self.head
     def get_tail(self):
-        return self.long
+        return self.tail
     def get_distance(self):
         return self.cluster
     def get_travel_time(self):

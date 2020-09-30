@@ -188,10 +188,13 @@ def readData():
     ####this is a list of lists, each sublist is [time,o(lat,long),d(lat,long)]
     tripList = pd.read_csv('nodedTripList.csv').values.tolist()
     clusterList = pd.read_csv('clusterDict.csv').values.tolist()
-    
     PUDOList = pd.read_csv('network_PUDOs.csv').values.tolist()
     global nodeDict, edgeDict
-    (nodeDict,edgeDict) = ATXxmlparse.getNetworkTopo(config['networkXML'])
+    try:
+        nodeDict, edgeDict
+    except:
+        
+        (nodeDict,edgeDict) = ATXxmlparse.getNetworkTopo(config['networkXML'])
     for c in clusterList:
         nodeDict[c[0]].cluster = c[1]
     return (tripList, PUDOList) #(trips, PUDOList, nodeList, edgeList, clusterDict)

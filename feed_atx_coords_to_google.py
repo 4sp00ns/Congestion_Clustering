@@ -10,6 +10,8 @@ import json
 import googlemaps as gm
 import os
 import datetime
+import ATXxmlparse as ATXML
+import vehicleSim
 
 cwd = os.getcwd()
 print(cwd)
@@ -71,30 +73,42 @@ def Load_Data():
             edgeDict[ID-7] = Edge(ID-7, nodeDict[head],nodeDict[tail],[])
     return (nodeDict, edgeDict)
 
-def Google_travel_time(edgeDict):
-    timetest = []
+def Google_travel_time(edgeDict, edge):
     gmaps = gm.Client(key=config['api_key'])
     init_time = (datetime.datetime(2021,4,1,17,0) - datetime.datetime(1970,1,1,0,0)).total_seconds()
-    for edge in range(1,len(edgeDict)):
-        #1609480800 seconds since 1/1/1970 UCT
-        for t in range(0,1):
-            result = gmaps.distance_matrix(str(edgeDict[edge].get_head()), str(edgeDict[edge].get_tail()),\
-                                           mode='driving', departure_time=init_time + t*15*60) #["rows"][0]["elements"][0]["distance"]["value"]
-            print(result) 
-            distance = result['rows'][0]['elements'][0]['distance']['value']
-            duration = result['rows'][0]['elements'][0]['duration']['value']
-            duration_in_traffic = result['rows'][0]['elements'][0]['duration_in_traffic']['value']
-            speed_mph = 2.37 * distance / (duration_in_traffic + 1 )
-            edgeDict[edge].travel_time.append(duration_in_traffic)
-            #distance over time for rate (speed) is better congestion metric
-            #pull rush hour time for all edges and look for slowest speed to find congestion and then test time series
-            #we need to test time series because right now its returning flat values
-            timetest.append(speed_mph)
-            print(speed_mph)
-    print(timetest)
+    head = nodeDict[edgeDict[edge].get_head()]
+    tail = nodeDict[edgeDict[edge].get_tail()]
+    #1609480800 seconds since 1/1/1970 UCT
+    result = gmaps.distance_matrix(head.get_coords_tup(),tail.get_coords_tup()\
+                                   ,mode='driving'\
+                                   , departure_time=init_time
+                                   , traffic_model = 'pessimistic') #["rows"][0]["elements"][0]["distance"]["value"]
+                                    
+    origin = result['origin_addresses']
+    destination = result['destination_addresses']
+    distance = result['rows'][0]['elements'][0]['distance']['value']
+    duration = result['rows'][0]['elements'][0]['duration']['value']
+    try:
+        duration_in_traffic = result['rows'][0]['elements'][0]['duration_in_traffic']['value']
+    except:
+        duration_in_traffic = duration
+    speed_mph = 2.37 * distance / (duration_in_traffic + 1 )
+    return [head.get_ID(),tail.get_ID(),origin,destination,distance,duration,duration_in_traffic,speed_mph]
+        #print(speed_mph)
+
+outlist = []
+for edge in edgeDict.keys():
+    out = Google_travel_time(edgeDict,edge)
+    outlist.append(out)
+odf = pd.DataFrame(outlist\
+                   , columns = ['head','tail','origin_addr','dest_addr','distance','duration','traffic_duration','speed_mph']\
+                   )
+odf.to_csv('googlemaps_data_full.csv', index = False)
     #for edge in edgeDict:
-    return timetest
-(nodeDict, edgeDict) = Load_Data()
-print(str(edgeDict[1].get_head()))       
-result = Google_travel_time(edgeDict)
+
+
+#(nodeDict, edgeDict) = ATXML.getNetworkTopo('')
+
+#print(str(edgeDict[1].get_head()))       
+#result = Google_travel_time(edgeDict)
 #the coordinates need to be divided by 1000000
