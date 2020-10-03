@@ -81,6 +81,8 @@ class PUDO(object):
         return self.cluster
     def get_capacity(self):
         return self.capacity
+    def get_ID(self):
+        return self.get_node().get_ID()
         
 class Node(object):
     def __init__(self, ID, lat, long, cluster):
@@ -264,10 +266,10 @@ def createSchedule(tripList):
                                 'Ride',\
                                 Ride(t[0],\
                                      eTime,\
-                                     t[1],\
-                                     t[2],\
-                                     findPUDO(nodeDict[str(t[1])]),\
-                                     findPUDO(nodeDict[str(t[2])])))
+                                     str(t[1]),\
+                                     str(t[2]),\
+                                     findPUDO(nodeDict[str(t[1])])[0],\
+                                     findPUDO(nodeDict[str(t[2])])[0]))
     return schedule
 
 def getClusterAdjacencies():
@@ -293,20 +295,23 @@ def getClusterAdjacencies():
 #def findCluster(clusterDict, node):
 #    return clusterDict[node]
 def findPUDO(node):
-    nearbyPUDOs = []
+    #ranks adjacent PUDOS by proximity to the node and returns an ordered list
+    nearbyPUDOs = {}
     #cluster = findCluster(clusterDict, node)
     adjClusters = adjDict[node.get_cluster()]
-    for p in PUDOs.keys():
-        if PUDOs[p].get_cluster() in adjClusters:
-            nearbyPUDOs.append(p)
-    minDist = 99999
-    minPUDO = nearbyPUDOs[0]
-    for n in nearbyPUDOs:
-        dist = shortestPath(node.get_ID(), n)[1]
-        if dist < minDist:
-            minPUDO = PUDOs[n]
-            minDist = dist
-    return minPUDO
+    for p in PUDOs.values():
+        if p.get_cluster() in adjClusters:
+            nearbyPUDOs[p] = shortestPath(node.get_ID(), p.get_ID())[1]
+    outlist = sorted(nearbyPUDOs, key=nearbyPUDOs.get)
+    
+#    minDist = 99999
+#    minPUDO = nearbyPUDOs[0]
+#    for n in nearbyPUDOs:
+#        dist = shortestPath(node.get_ID(), n.get_ID())[1]
+#        if dist < minDist:
+#            minPUDO = n
+#            minDist = dist
+    return outlist
 
 def shortestPath(origin, destination):
     path = nx.astar_path(ATXnet,str(origin),str(destination),weight='weight')
@@ -316,19 +321,36 @@ def shortestPath(origin, destination):
 def assignVehicle(ride, schedule): #,enrouteDict):
     oPUDO = ride.get_oPUDO()
     if oPUDO.get_capacity()>0:
-        print('reducing PUDO capacity by 1 at' + oPUDO.get_node().get_ID())
-        oPUDO.capacity = oPUDO.capacity-1
+        #if the default origin PUDO has a vehicle it is assigned to the ride
+        oPUDO.capacity -= 1
         enrouteDict[ride.get_hail_time()] = ride
         schedule[ride.get_arrival_time()] = Event(ride.get_arrival_time(), 'Arrival',ride)
-        #check if origin PUDO has a vehicle, if so, assign
-        #if not, check enroute vehicles for rideshare
-        #if none, find available vehicle at adjacent pudo and relocate it (is this is a new event?)
-        #add the trip keyed by a tuple of origin and destination times to the enrouteDict
     else:
+        #if not, we check ongoing rides for compatible rideshares
         print('no vehicle available, checking rideshare')
         sharing, schedule = rideshareLogic(ride, enrouteDict, schedule)
         if sharing == False:
-            print('no rideshares, grab adj')
+            print('no rideshare, pulling from adjacent PUDOs')
+            #if no compatible rideshares are found we pull the PUDOs of the adjacent clusters
+            nearbyPUDOs = findPUDO(nodeDict[ride.get_origin()])
+            #walk through adjacent PUDOs (in order of distance) and find nearest PUDO with capacity
+            for np in nearbyPUDOs:
+                if np.get_capacity() > 0:
+                    chosenPUDO = np
+                    break
+            #strip a vehicle from that PUDO and assign it
+            chosenPUDO.capacity -= 1
+            #recalculate the route and arrival time to include the vehicle travel
+            #from the adjacent PUDO to the origin PUDO
+            rideExt = shortestPath(chosenPUDO.get_ID(), ride.get_oPUDO().get_ID())
+            ride.route = rideExt[0] + ride.get_route()
+            ride.arrival_time = ride.get_arrival_time() + dt.timedelta(minutes = rideExt[1])
+            #add the extended route to enroute trips and add the arrival to the schedule
+            enrouteDict[ride.get_hail_time()] = ride
+            schedule[ride.get_arrival_time()] = Event(ride.get_arrival_time(), 'Arrival',ride)            
+                    
+                    
+            
     return schedule
 
 def rideshareLogic(ride, enrouteDict, schedule):
@@ -355,7 +377,6 @@ def rideshareLogic(ride, enrouteDict, schedule):
             if dCluster in adjClusters or nodeDict[route[-1:][0]].get_cluster() in rideClusters:
                 print('found a compatible route')
                 #remove existing arrival
-                #print('DEBUG ARRLIST', schedule.keys(), enrouteDict[rkey].get_arrival_time())
                 schedule.pop(enrouteDict[rkey].get_arrival_time())
                 #calculate route diversion
                 rideDiversion = shortestPath(vehicle_loc, ride.get_origin())
@@ -363,8 +384,8 @@ def rideshareLogic(ride, enrouteDict, schedule):
                 if dCluster in adjClusters:
                     #if the current route contains both origin and destination
                     #the rideshare is dropped first
-                    newRoute = shortestPath(ride.get_origin(), ride.get_destination())
-                    rideExt = shortestPath(ride.get_destination(), route[-1:][0])
+                    newRoute = shortestPath(ride.get_oPUDO().get_ID(), ride.get_dPUDO().get_ID())
+                    rideExt = shortestPath(ride.get_dPUDO().get_ID(), route[-1:][0])
                     objA = ride
                     objB = enrouteDict[rkey]
                     ride.arrival_time = ride.get_hail_time()+dt.timedelta(minutes = rideDiversion[1]+newRoute[1])
@@ -372,8 +393,8 @@ def rideshareLogic(ride, enrouteDict, schedule):
                 if nodeDict[route[-1:][0]].get_cluster() in rideClusters:
                     #if the rideshare requires extending the current route
                     #the current rider is dropped first
-                    newRoute = shortestPath(ride.get_origin(), route[-1:][0])
-                    rideExt = shortestPath(route[-1:][0], ride.get_destination())
+                    newRoute = shortestPath(ride.get_oPUDO().get_ID(), route[-1:][0])
+                    rideExt = shortestPath(route[-1:][0], ride.get_dPUDO().get_ID())
                     objA = enrouteDict[rkey]
                     objB = ride
                     enrouteDict[rkey].arrival_time = ride.get_hail_time()+dt.timedelta(minutes = rideDiversion[1]+newRoute[1])
@@ -394,12 +415,12 @@ def cleanEnroute(enrouteDict, time):
 def masterEventHandler(event, schedule):
     #arrivals
     if event.get_eType() == 'Rideshare':
-        print('handling it')
+        #print('handling it')
         pass
         #run reporting for the event here
     elif event.get_eType() == 'Arrival':
         #print('DEBUG EOBJ', event.get_eObj())
-        nodeDict[str(event.get_eObj().get_dPUDO().get_node().get_ID())].PUDO.capacity +=1
+        nodeDict[str(event.get_eObj().get_dPUDO().get_ID())].PUDO.capacity +=1
         enrouteDict.pop(event.get_eObj().get_hail_time())
         pass
         #add vehicle to destination PUDO capacity
@@ -408,7 +429,7 @@ def masterEventHandler(event, schedule):
     #ride requests
     elif event.get_eType() == 'Ride':
         ride = event.get_eObj()
-        path = shortestPath(ride.get_oPUDO().get_node().get_ID(), ride.get_dPUDO().get_node().get_ID())
+        path = shortestPath(ride.get_oPUDO().get_ID(), ride.get_dPUDO().get_ID())
         ride.route = path[0]
         ride.arrival_time = ride.get_hail_time() + dt.timedelta(minutes = path[1])
         schedule = assignVehicle(ride, schedule)#,enrouteList)
@@ -420,14 +441,19 @@ def masterEventHandler(event, schedule):
     else:
         print('unhandled event type')
         print(event.get_eType())
-    return schedule   
+    return schedule
+
+def stateReport(verbose):
+    #this will first function as a series of debug checks to ensure the model is working correctly
+    idleVehicles = 0
+    for p in PUDOs.values():
+        idleVehicles += p.get_capacity()
+    print("# idle vehicles", idleVehicles)
 def getNextEvent(schedule):
     time = min(schedule.keys())
     #delta_t = currTime - oldTime
     event = schedule.pop(time)
     return event, schedule#, delta_t
-def addEvent(time, eventType, schedule):
-    schedule
 
 def simMaster():
     global config
@@ -438,6 +464,9 @@ def simMaster():
         event, schedule = getNextEvent(schedule)
         print(event.get_eTime(), event.get_eType())
         schedule = masterEventHandler(event, schedule)
+        stateReport(True)
+        #state reporting
+        
     
     
 
