@@ -350,6 +350,7 @@ def assignVehicle(ride, schedule): #,enrouteDict):
             try:
                 chosenPUDO.capacity -= 1
             except:
+                
                 for np in nearbyPUDOs:
                     nearbyPUDOs += findPUDO(nodeDict[np.get_ID()])
                 for np in nearbyPUDOs:
@@ -402,7 +403,10 @@ def rideshareLogic(ride, schedule):
                 ###add its adjacent clusters to our route cluster list###
                 adjClusters += adjDict[nodeDict[str(route[pos])].get_cluster()]
         adjClusters = list(set(adjClusters))
-        adjClusters.pop(adjClusters.index(finalCluster))
+        try:
+            adjClusters.pop(adjClusters.index(finalCluster))
+        except:
+            pass
         if oCluster in adjClusters:
             ###if the ride originates in a cluster adjacent to the untraveled###
             ###portion of the route###
@@ -411,9 +415,13 @@ def rideshareLogic(ride, schedule):
                 ###or the route destination lies adjacent to the requested rides route clusters###
                 print('found a compatible route', rkey)
                 #remove existing arrival
-                schedule.pop((enroute.get_arrival_time(),'Arrival',enroute.get_ID()))
+                if enroute.get_ID() == 'reloc':
+                    schedule.pop((enroute.get_arrival_time(),'Reallocation',enroute.get_ID()))
+                else:
+                    schedule.pop((enroute.get_arrival_time(),'Arrival',enroute.get_ID()))
+                
                 #calculate route diversion to pick up new rider
-                rideDiversion = shortestPath(vehicle_loc, ride.get_origin())
+                rideDiversion = shortestPath(vehicle_loc, ride.get_oPUDO().get_ID())
                 #calculate new route and route extension, depending on whom is dropped off first
                 if dCluster in adjClusters:
                     print('within curr rout')
@@ -478,13 +486,14 @@ def reallocateVehicles(schedule, currTime):
     for c in adjDict.keys():
         vCount[c] = []
     #sum capacity of PUDOs in each cluster
-    for p in PUDOs.values():
-        adjacencies = adjDict[p.get_cluster()]
+    for p2 in PUDOs.values():
+        adjacencies = adjDict[p2.get_cluster()]
         for a in adjacencies:
-            vCount[a].append(p.get_capacity())
+            vCount[a].append(p2.get_capacity())
     #count vehicles already enroute to the cluster
     for e in enrouteDict.values():
-        vCount[e.get_dPUDO().get_cluster()][0] += 1
+        for aj in adjDict[e.get_dPUDO().get_cluster()]:
+            vCount[aj][0] += 1
     #convert vCount to a ratio of vehicles to PUDOs (normalize)
     for it in vCount.keys():
         vCount[it] = sum(vCount[it])/len(vCount[it])
@@ -495,14 +504,20 @@ def reallocateVehicles(schedule, currTime):
             overCapCluster = max(vCount.keys(), key=(lambda key: vCount[key]))
             print('cluster with most available vehicles is', overCapCluster)
             for pp in PUDOs.values():
-                if pp.get_cluster() == overCapCluster:
-                    oPUDO = pp
-                if pp.get_cluster() == macroCluster:
-                    dPUDO = pp
+                if pp.get_cluster() in adjDict[overCapCluster]:
+                    #print('found opudo', pp.get_ID())
+                    #print(pp.get_cluster(), 'in', adjDict[overCapCluster])
+                    oPUDO = pp.get_ID()
+            for p in PUDOs.values():
+                if p.get_cluster() in adjDict[macroCluster]:
+                    #print('found dpudo',p.get_ID())
+                    #print(p.get_cluster(), 'in', adjDict[macroCluster])
+                    dPUDO = p.get_ID()
                     
-            oPUDO.capacity -= 1
-            ride = Ride('reloc', currTime, oPUDO.get_ID(), dPUDO.get_ID(), oPUDO, dPUDO)
-            ride.route, traveltime = shortestPath(oPUDO.get_ID(), dPUDO.get_ID())
+            PUDOs[oPUDO].capacity -= 1
+            ride = Ride('reloc', currTime, oPUDO, dPUDO, PUDOs[oPUDO], PUDOs[dPUDO])
+            (ride.route, traveltime) = shortestPath(oPUDO, dPUDO)
+            #print('DEBUG realloc traveltime',traveltime, oPUDO, dPUDO)
             ride.arrival_time = currTime + dt.timedelta(minutes = traveltime)
             schedule[(ride.get_arrival_time(),'Reallocation',ride.get_ID())] = Event(ride.get_arrival_time(), 'Reallocation',ride)
             enrouteDict[(ride.get_hail_time(), ride.get_ID())] = ride
@@ -538,13 +553,56 @@ def masterEventHandler(event, schedule):
         schedule = assignVehicle(ride, schedule)#,enrouteList)
         #enrouteDict[ride.get_hail_time()] = ride.get_route()
         schedule = createSchedule(schedule, 1)
-    elif event.get_eType == 'Reallocation':
+    elif event.get_eType() == 'Reallocation':
         event.get_eObj().dPUDO.capacity +=1
     else:
         print('unhandled event type')
         print(event.get_eType())
+    reporting = eventReport(event, False)
     return schedule
-
+def eventReport(event, write):
+    
+    if write == True:
+        out_df = pd.DataFrame(reporting, columns = ['time','type','ID','hail_time'\
+                                              ,'arrival_time','vehicle_time','origin'\
+                                              ,'destination','oPUDO','dPUDO','route'\
+                                              ,'VMT','origin_walk','dest_walk','total_walk'])
+        out_df.to_csv('reporting' + config["runid"] + '.csv')
+        return reporting
+    #if event.get_eType() in ['Ride','Arrival','Reallocation']
+    obj = event.get_eObj()
+    vehicle_time = obj.get_arrival_time() - obj.get_hail_time()
+    walk_o_route = shortestPath(obj.get_origin(), obj.get_oPUDO().get_ID())[0]
+    walkO = 0
+    walkD = 0
+    for wo in range(len(walk_o_route)-1):
+        walkO += edgeDict[walk_o_route[wo], walk_o_route[wo+1]].get_length()
+    walk_d_route = shortestPath(obj.get_destination(), obj.get_dPUDO().get_ID())[0]
+    for wd in range(len(walk_d_route)-1):
+        walkD += edgeDict[walk_d_route[wd], walk_d_route[wd+1]].get_length()
+    ttl_walk = walkO + walkD
+    VMT = 0
+    route = obj.get_route()
+    for n in range(len(route)-1):
+        VMT += edgeDict[route[n],route[n+1]].get_length()
+    out = [event.get_eTime()\
+           ,event.get_eType()\
+           ,obj.get_ID()\
+           ,obj.get_hail_time()\
+           ,obj.get_arrival_time()\
+           ,vehicle_time
+           ,obj.get_origin()\
+           ,obj.get_destination()\
+           ,obj.get_oPUDO().get_ID()\
+           ,obj.get_dPUDO().get_ID()\
+           ,route\
+           ,VMT\
+           ,walkO\
+           ,walkD\
+           ,ttl_walk\
+           ]
+    reporting.append(out)
+    return reporting         
 def stateReport(verbose):
     #this will first function as a series of debug checks to ensure the model is working correctly
     idleVehicles = 0
@@ -558,6 +616,9 @@ def getNextEvent(schedule):
     return event, schedule#, delta_t
 
 def simMaster():
+    global reporting
+    reporting = []
+    tripct = 0
     global config
     config = getConfig()
     PUDOList = readData()
@@ -565,6 +626,9 @@ def simMaster():
     PUDOs, schedule = createDataStructures(PUDOList, schedule)
     try:
         while len(schedule) > 0:
+            tripct += 1
+            if tripct > config["eventlimit"]:
+                break
             event, schedule = getNextEvent(schedule)
             print(event.get_eTime(), event.get_eType(), event.get_eObj().get_ID())
             schedule = masterEventHandler(event, schedule)
@@ -574,6 +638,7 @@ def simMaster():
         print(e)
         traceback.print_exc()
         return(enrouteDict, schedule)
+    eventReport(None, True)
     return (enrouteDict, schedule)
 
         
