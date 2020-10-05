@@ -4,5 +4,6 @@
 "networkXML":"F:\\Austin_Multimodal\\austin_multimodalnetwork\\austin_multimodalnetwork.xml",
 "ridesharing":"no",
 "numvehicles":1,
-"numtrips":10
+"numtrips":10,
+"vehiclesperpudo":10
 }
