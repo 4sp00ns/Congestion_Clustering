@@ -62,6 +62,7 @@ def allOD(tripData):
     for n in nodeDict.keys():
         allOD.append(nodeDict[n].get_coords_tup())
     return allOD
+
 def run_kmeans(trip_locations):
     data_array = np.asarray(trip_locations)
     #trip_loc.show()
@@ -73,6 +74,13 @@ def run_kmeans(trip_locations):
     #txtout = np.asarray(latlon)
     #np.savetxt('testout_weight.csv', txtout, delimiter=',')
     return k_means_data
+
+def kmean_weighted():
+    X = np.array([[1, 2], [1, 4], [1, 0],
+                  [2, 2], [2, 4], [2, 0]])
+    weight = np.array([[10000,1,1,1,1,1]])
+    kmeans = c.KMeans(n_clusters=2, random_state=0).fit_predict(X,None,sample_weight=weight)
+    return kmeans
 
 def createClusterDict(clusterData, allOD, nodes):
     print('assigning clusters to nodes')
@@ -186,9 +194,9 @@ def coordinateMatchTrips(trips):
 #(nodeDict,edgeDict) = ATXxmlparse.getSDBNetworkTopo()
 #tripData = getTripData('')
 #rndDict, truncDict = dictIndexCoords(nodeDict)
-coordTrips = coordinateMatchTrips(tripData)
+#coordTrips = coordinateMatchTrips(tripData)
 #ALLOD = allOD(tripData)
 #kmd = run_kmeans(ALLOD)
 #clusterDict = createClusterDict(kmd[1],ALLOD, nodeDict)
 #PUDOlist= PUDOtoNetwork(kmd[0],nodeDict)
-nodedTripList = nodedTripList(coordTrips)
+#nodedTripList = nodedTripList(coordTrips)

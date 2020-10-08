@@ -12,70 +12,17 @@ import os
 import datetime
 import ATXxmlparse as ATXML
 import vehicleSim
+import pandas as pd
 
 cwd = os.getcwd()
 print(cwd)
 with open(cwd+'\config.json') as f:
   config = json.load(f)
 
-class Node(object):
-    def __init__(self, ID, lat, lng, edges):
-        self.lat = lat
-        self.lng = lng
-        self.edges = edges
-    def get_ID(self):
-        return self.ID
-    def get_lat(self):
-        return self.lat
-    def get_lng(self):
-        return self.lng
-    def get_edges(self):
-        return self.edges
-    def __str__(self):
-        return str(self.lat) +','+ str(self.lng)
-    def __hash__(self):
-        return hash(str(self))
-    def __eq__(self, other):
-        return str(self) == str(other)
-    
-class Edge(object):
-    def __init__(self, ID, head, tail, travel_time):
-        self.head = head
-        self.tail = tail
-        self.travel_time = travel_time
-    def get_ID(self):
-        return self.ID
-    def get_head(self):
-        return self.head
-    def get_tail(self):
-        return self.tail
-    def get_travel_time(self, hour):
-        return self.travel_time[hour]
-def Load_Data():   
-    nodeDict = {}
-    edgeDict = {}
-    nodeObj = open(cwd+r'\austin_sdb_node.txt')
-    netObj = open(cwd+r'\austin_sdb_net.txt')
-    node_Read = csv.reader(nodeObj, delimiter="\t")
-    net_Read = csv.reader(netObj, delimiter="\t")
-    for row in node_Read:
-        if row[0] != 'Node':
-            ID = int(row[0])
-            lat = int(row[2])/1000000
-            lng = int(row[1])/1000000
-            nodeDict[ID] = Node(ID,lat,lng,[])
-    ID = 0
-    for row in net_Read:
-        ID+=1
-        if ID > 7:
-            tail = int(row[1])
-            head = int(row[2])
-            edgeDict[ID-7] = Edge(ID-7, nodeDict[head],nodeDict[tail],[])
-    return (nodeDict, edgeDict)
-
-def Google_travel_time(edgeDict, edge):
+def Google_travel_time(edge):
     gmaps = gm.Client(key=config['api_key'])
-    init_time = (datetime.datetime(2021,4,1,17,0) - datetime.datetime(1970,1,1,0,0)).total_seconds()
+    init_time = (datetime.datetime(2021,3,31,13,0) - datetime.datetime(1970,1,1,0,0)).total_seconds()
+    #print(init_time)
     head = nodeDict[edgeDict[edge].get_head()]
     tail = nodeDict[edgeDict[edge].get_tail()]
     #1609480800 seconds since 1/1/1970 UCT
@@ -84,8 +31,8 @@ def Google_travel_time(edgeDict, edge):
                                    , departure_time=init_time
                                    , traffic_model = 'pessimistic') #["rows"][0]["elements"][0]["distance"]["value"]
                                     
-    origin = result['origin_addresses']
-    destination = result['destination_addresses']
+    origin = result['origin_addresses'][0]
+    destination = result['destination_addresses'][0]
     distance = result['rows'][0]['elements'][0]['distance']['value']
     duration = result['rows'][0]['elements'][0]['duration']['value']
     try:
@@ -95,15 +42,30 @@ def Google_travel_time(edgeDict, edge):
     speed_mph = 2.37 * distance / (duration_in_traffic + 1 )
     return [head.get_ID(),tail.get_ID(),origin,destination,distance,duration,duration_in_traffic,speed_mph]
         #print(speed_mph)
-
-outlist = []
+ii=0
+donelist = []
+outlist = pd.read_csv('googlemaps_data_full.csv').values.tolist()
+for o in outlist:
+    donelist.append((o[0],o[1]))
 for edge in edgeDict.keys():
-    out = Google_travel_time(edgeDict,edge)
-    outlist.append(out)
-odf = pd.DataFrame(outlist\
-                   , columns = ['head','tail','origin_addr','dest_addr','distance','duration','traffic_duration','speed_mph']\
-                   )
-odf.to_csv('googlemaps_data_full.csv', index = False)
+    ii+=1
+    if (edge[0], edge[1]) in donelist:
+        print('skipping edge',edge[0], edge[1])
+    else:
+        print('fetching edge',edge[0], edge[1])
+        try:
+            out = Google_travel_time(edge)
+            outlist.append(out)
+            #if ii > 100:
+            #    break
+            donelist.append((edge[0], edge[1]))
+        except:
+            print('cannot handle edge',edge[0], edge[1])
+    if ii%1000 == 0:        
+        odf = pd.DataFrame(outlist\
+                           , columns = ['head','tail','origin_addr','dest_addr','distance','duration','traffic_duration','speed_mph']\
+                           )
+        odf.to_csv('googlemaps_data_full.csv', index = False)
     #for edge in edgeDict:
 
 
