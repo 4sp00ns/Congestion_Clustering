@@ -6,6 +6,6 @@
 "numvehicles":1,
 "numtrips":10,
 "vehiclesperpudo":10,
-"eventlimit":1000,
+"eventlimit":10,
 "runid":"test"
 }

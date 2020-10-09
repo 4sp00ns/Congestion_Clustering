@@ -11,11 +11,15 @@ import community as community_louvain
 import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import networkx as nx
+from networkx import community as c
 
+###needs undirected###
+asyn = c.asyn_fluidc(ATXnet, 500)
+kclq = c.k_clique_communities(ATXnet,500)
 
 #partition = community_louvain.best_partition(ATXnet)
 
-# draw the graph
+# draw the graphk
 #pos = nx.spring_layout(ATXnet)
 ## color the nodes according to their partition
 #cmap = cm.get_cmap('viridis', max(partition.values()) + 1)

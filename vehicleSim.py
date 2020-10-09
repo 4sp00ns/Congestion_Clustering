@@ -13,32 +13,9 @@ import json
 import pandas as pd
 import datetime as dt
 import traceback
-
-#class Vehicle(object):
-#    def __init__(self, ID, rider, position, route, objective, charge_level, seats, bid_price, energy_rate, actioncount):
-#        self.ID = ID
-#        self.rider = rider
-#        self.position = position
-#        self.route= []
-#        self.objective = 'vacant'
-#        self.charge_level = charge_level
-#        self.seats=seats
-#
-#    def get_ID(self):
-#        return self.ID
-#    def get_position(self):
-#        return self.position
-#    def get_route(self):
-#        return self.route
-#    def get_charge_level(self):
-#        return self.charge_level
-#    def get_rider(self):
-#        return self.rider
-#    def __str__(self):
-#        return 'vehicle ' + str(self.ID) + ' at ' + str(self.position) + ' node, currently: ' + str(self.objective)
-#    def __repr__(self):
-#        return self.__str__()
-
+from pudo_work import load_gtraffic
+from ATXxmlparse import Edge
+from ATXxmlparse import Node
         
 class Ride(object):
     def __init__(self, ID, hail_time, origin, destination, oPUDO, dPUDO):
@@ -81,58 +58,58 @@ class PUDO(object):
     def get_ID(self):
         return self.get_node().get_ID()
         
-class Node(object):
-    def __init__(self, ID, lat, long, cluster):
-        self.ID = ID
-        self.lat = lat
-        self.long = long
-        self.cluster = cluster
-        self.PUDO = 0
-    def get_ID(self):
-        return self.ID
-    def get_lat(self):
-        return self.lat
-    def get_long(self):
-        return self.long
-    def get_cluster(self):
-        return self.cluster
-    def get_PUDO(self):
-        return self.PUDO
-    def get_coords_tup(self):
-        return (self.lat,self.long)
-    def get_coords_str(self):
-        return (str(self.lat)+','+str(self.long))
+#class Node(object):
+#    def __init__(self, ID, lat, long, cluster):
+#        self.ID = ID
+#        self.lat = lat
+#        self.long = long
+#        self.cluster = cluster
+#        self.PUDO = 0
+#    def get_ID(self):
+#        return self.ID
+#    def get_lat(self):
+#        return self.lat
+#    def get_long(self):
+#        return self.long
+#    def get_cluster(self):
+#        return self.cluster
+#    def get_PUDO(self):
+#        return self.PUDO
+#    def get_coords_tup(self):
+#        return (self.lat,self.long)
+#    def get_coords_str(self):
+#        return (str(self.lat)+','+str(self.long))
     
-class Edge(object):
-    def __init__(self, ID, tail, head, capacity, length, fft, b, exponent, speed):
-        self.ID = ID
-        self.head = head
-        self.tail = tail
-        self.capacity = capacity
-        self.length = length
-        self.fft = fft
-        self.b = b
-        self.exponent = exponent
-        self.speed = speed
-        self.congested_speed = fft
-    def get_head(self):
-        return self.head
-    def get_tail(self):
-        return self.tail
-    def get_capacity(self):
-        return self.capacity
-    def get_length(self):
-        return self.length
-    def get_fft(self):
-        return self.fft
-    def get_b(self):
-        return self.b
-    def get_exponent(self):
-        return self.exponent
-    def get_speed(self):
-        return self.speed
-    def get_congested_speed(self):
-        return self.congested_speed
+#class Edge(object):
+#    def __init__(self, ID, tail, head, capacity, length, fft, b, exponent, speed):
+#        self.ID = ID
+#        self.head = head
+#        self.tail = tail
+#        self.capacity = capacity
+#        self.length = length
+#        self.fft = fft
+#        self.b = b
+#        self.exponent = exponent
+#        self.speed = speed
+#        self.congested_speed = fft
+#    def get_head(self):
+#        return self.head
+#    def get_tail(self):
+#        return self.tail
+#    def get_capacity(self):
+#        return self.capacity
+#    def get_length(self):
+#        return self.length
+#    def get_fft(self):
+#        return self.fft
+#    def get_b(self):
+#        return self.b
+#    def get_exponent(self):
+#        return self.exponent
+#    def get_duration(self):
+#        return self.speed
+#    def get_congested_speed(self):
+#        return self.congested_speed
 
 class Event(object):
     def __init__(self,eTime,eType,eObj):
@@ -241,12 +218,16 @@ def createDataStructures(PUDOList, schedule):
     
 def createNetwork():
     print('building network')
-    global ATXnet
-    ATXnet = nx.DiGraph()
+    global ATXnet, ATXcongest
+    load_gtraffic(edgeDict)
+    ATXnet = nx.Graph()
+    ATXcongest = nx.Graph()
     ATXnet.add_nodes_from(nodeDict.keys())
+    ATXcongest.add_nodes_from(nodeDict.keys())
     for e in edgeDict.keys():
         if e[0] != e[1]:
-            ATXnet.add_edge(e[0],e[1],weight=float(edgeDict[e].get_fft()))
+            ATXnet.add_edge(e[0],e[1],weight=float(edgeDict[e].get_duration()))
+            ATXcongest.add_edge(e[0],e[1],weight=float(edgeDict[e].get_congested_duration()))
     #return ATXnet
 def buildPUDOs(PUDOList):
     print('building PUDOs')

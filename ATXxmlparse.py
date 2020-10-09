@@ -32,7 +32,7 @@ class Node(object):
         return (str(self.lat)+','+str(self.long))
     
 class Edge(object):
-    def __init__(self, ID, tail, head, capacity, length, fft, b, exponent, speed):
+    def __init__(self, ID, tail, head, capacity, length, fft, b, exponent, duration):
         self.ID = ID
         self.head = head
         self.tail = tail
@@ -41,8 +41,8 @@ class Edge(object):
         self.fft = fft
         self.b = b
         self.exponent = exponent
-        self.speed = speed
-        self.congested_speed = fft
+        self.duration = duration
+        self.congested_duration = fft
     def get_head(self):
         return self.head
     def get_tail(self):
@@ -57,10 +57,10 @@ class Edge(object):
         return self.b
     def get_exponent(self):
         return self.exponent
-    def get_speed(self):
-        return self.speed
-    def get_congested_speed(self):
-        return self.congested_speed
+    def get_duration(self):
+        return self.duration
+    def get_congested_duration(self):
+        return self.congested_duration
 
 def createTransformer():
     return pyproj.Transformer.from_crs("epsg:2958", "epsg:4326")

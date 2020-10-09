@@ -75,12 +75,15 @@ def run_kmeans(trip_locations):
     #np.savetxt('testout_weight.csv', txtout, delimiter=',')
     return k_means_data
 
-def kmean_weighted():
-    X = np.array([[1, 2], [1, 4], [1, 0],
-                  [2, 2], [2, 4], [2, 0]])
-    weight = np.array([[10000,1,1,1,1,1]])
+def kmean_weighted(X,weight):
     kmeans = c.KMeans(n_clusters=2, random_state=0).fit_predict(X,None,sample_weight=weight)
     return kmeans
+
+def load_gtraffic(edgeDict):
+    traffic = pd.read_csv('googlemaps_data_full.csv').values.tolist()
+    for t in traffic:
+        edgeDict[(str(t[1]),str(t[0]))].duration = t[5]
+        edgeDict[(str(t[1]),str(t[0]))].congested_duration = t[6]
 
 def createClusterDict(clusterData, allOD, nodes):
     print('assigning clusters to nodes')
