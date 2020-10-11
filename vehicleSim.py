@@ -212,7 +212,7 @@ def readData(outstr, ncluster):
         print('reloading nodeDict and edgeDict')
         (nodeDict,edgeDict) = ATXxmlparse.getSDBNetworkTopo()
     for c in clusterList:
-        nodeDict[str(int(c[0]))].cluster = c[3]
+        nodeDict[str(int(c[0]))].cluster = int(c[3])
     return PUDOList #(trips, PUDOList, nodeList, edgeList, clusterDict)
 
 def createDataStructures(PUDOList, schedule):
@@ -277,9 +277,11 @@ def getClusterAdjacencies():
         clusterList.append((nodeDict[e[0]].get_cluster(),nodeDict[e[1]].get_cluster()))
     uniqAdj = list(set(clusterList))
     for u in uniqAdj:
-        adjDict[u[0]] = []
+        adjDict[int(u[0])] = []
+        adjDict[int(u[1])] = []
     for u in uniqAdj:
-        adjDict[u[0]].append(u[1])
+        adjDict[int(u[0])].append(int(u[1]))
+        adjDict[int(u[1])].append(int(u[0]))
     for a in adjDict.keys():
         if a not in adjDict[a]:
             adjDict[a].append(a)
