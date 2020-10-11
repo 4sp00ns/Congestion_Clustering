@@ -16,6 +16,7 @@ import traceback
 from pudo_work import load_gtraffic
 from ATXxmlparse import Edge
 from ATXxmlparse import Node
+import numpy as np
         
 class Ride(object):
     def __init__(self, ID, hail_time, origin, destination, oPUDO, dPUDO):
@@ -171,7 +172,7 @@ def getConfig():
     with open(cwd+r'\config.json') as f:
         config = json.load(f)            
     return config        
-def readData():
+def readData(outstr, ncluster):
     #load trip data
     #load pudo locations
     #load clusters
@@ -193,8 +194,17 @@ def readData():
         except:
             tripList.pop(0)
     tripList.sort(key=lambda x: x[0])
-    clusterList = pd.read_csv('clusterDict.csv').values.tolist()
-    PUDOList = pd.read_csv('network_PUDOs.csv').values.tolist()
+    clusterList = pd.read_csv('CLUSTERS\\clusterDict_'+outstr+str(ncluster)+'.csv'\
+                              ,dtype = {'id':np.int\
+                                        ,'lat':np.float64\
+                                        ,'long':np.float64\
+                                        ,'cluster':np.int})\
+                            .values.tolist()
+    PUDOList = pd.read_csv('PUDOS\\network_PUDOs'+outstr+str(ncluster)+'.csv'\
+                           ,dtype = {'id':np.int\
+                                     ,'lat':np.float64\
+                                     ,'long':np.float64})\
+                           .values.tolist()
     global nodeDict, edgeDict
     try:
         nodeDict, edgeDict
@@ -202,7 +212,7 @@ def readData():
         print('reloading nodeDict and edgeDict')
         (nodeDict,edgeDict) = ATXxmlparse.getSDBNetworkTopo()
     for c in clusterList:
-        nodeDict[str(c[0])].cluster = c[1]
+        nodeDict[str(int(c[0]))].cluster = c[3]
     return PUDOList #(trips, PUDOList, nodeList, edgeList, clusterDict)
 
 def createDataStructures(PUDOList, schedule):
@@ -220,8 +230,8 @@ def createNetwork():
     print('building network')
     global ATXnet, ATXcongest
     load_gtraffic(edgeDict)
-    ATXnet = nx.Graph()
-    ATXcongest = nx.Graph()
+    ATXnet = nx.DiGraph()
+    ATXcongest = nx.DiGraph()
     ATXnet.add_nodes_from(nodeDict.keys())
     ATXcongest.add_nodes_from(nodeDict.keys())
     for e in edgeDict.keys():
@@ -233,9 +243,9 @@ def buildPUDOs(PUDOList):
     print('building PUDOs')
     PUDOs = {}
     for p in PUDOList:
-        station = PUDO(nodeDict[str(p[0])], nodeDict[str(p[0])].get_cluster(),config["vehiclesperpudo"])
-        nodeDict[str(p[0])].PUDO = station
-        PUDOs[str(p[0])] = station
+        station = PUDO(nodeDict[str(int(p[0]))], nodeDict[str(int(p[0]))].get_cluster(),config["vehiclesperpudo"])
+        nodeDict[str(int(p[0]))].PUDO = station
+        PUDOs[str(int(p[0]))] = station
         #PUDOs.append(PUDO(p[o], clusterDict[p[0]],[]))
         
         ####TEMP FOR DEBUGGING RIDESHARE####
@@ -539,16 +549,16 @@ def masterEventHandler(event, schedule):
     else:
         print('unhandled event type')
         print(event.get_eType())
-    reporting = eventReport(event, False)
+    reporting = eventReport(event, False, "","")
     return schedule
-def eventReport(event, write):
+def eventReport(event, write, runid, ncluster):
     
     if write == True:
         out_df = pd.DataFrame(reporting, columns = ['time','type','ID','hail_time'\
                                               ,'arrival_time','vehicle_time','origin'\
                                               ,'destination','oPUDO','dPUDO','route'\
                                               ,'VMT','origin_walk','dest_walk','total_walk'])
-        out_df.to_csv('reporting' + config["runid"] + '.csv')
+        out_df.to_csv('REPORTING\\reporting_' + runid + ncluster + '.csv')
         return reporting
     #if event.get_eType() in ['Ride','Arrival','Reallocation']
     obj = event.get_eObj()
@@ -602,7 +612,8 @@ def simMaster():
     tripct = 0
     global config
     config = getConfig()
-    PUDOList = readData()
+    runid, ncluster = config["runids"][4], config["clustercounts"][7]
+    PUDOList = readData(runid, ncluster)
     schedule = {}
     PUDOs, schedule = createDataStructures(PUDOList, schedule)
     try:
@@ -619,7 +630,7 @@ def simMaster():
         print(e)
         traceback.print_exc()
         return(enrouteDict, schedule)
-    eventReport(None, True)
+    eventReport(None, True, runid, ncluster)
     return (enrouteDict, schedule)
 
         

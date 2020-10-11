@@ -9,7 +9,7 @@ import ATXxmlparse
 import sklearn.cluster as c
 #import json
 import pandas as pd
-
+from datetime import datetime
 
 ###pull trip data
 ###match it to nodes in the network (if needed) (hopefully never again)
@@ -63,21 +63,38 @@ def allOD(tripData):
         allOD.append(nodeDict[n].get_coords_tup())
     return allOD
 
-def run_kmeans(trip_locations):
+def run_kmeans(trip_locations, nclusters):
     data_array = np.asarray(trip_locations)
     #trip_loc.show()
     #data_array = np.array(trip_loc.collect())
     #for i in range (0,100,25):
     maxiter = 300 + 30*50
-    k_means_data = c.k_means(data_array, n_clusters = 500, verbose = True)
+    k_means_data = c.k_means(data_array, n_clusters = nclusters, verbose = False)
     centroid_arr = k_means_data[0]
     #txtout = np.asarray(latlon)
     #np.savetxt('testout_weight.csv', txtout, delimiter=',')
     return k_means_data
 
-def kmean_weighted(X,weight):
-    kmeans = c.KMeans(n_clusters=2, random_state=0).fit_predict(X,None,sample_weight=weight)
+def kmean_weighted(trip_weighted_node_coordinate_dict, nclusters):
+    X=np.array(list(trip_weighted_node_coordinate_dict.keys()))
+    weight=np.array(list(trip_weighted_node_coordinate_dict.values()))
+    kmeans = c.KMeans(n_clusters=nclusters, random_state=0, verbose = False).fit_predict(X,None,sample_weight=weight)
     return kmeans
+
+def trip_weighted_node_coord(tripList):
+    outdict = {}
+    for n in nodeDict.values():
+        outdict[(n.get_lat(),n.get_long())] = 1
+    for t in tripList:
+        olat = nodeDict[str(t[1])].get_lat()
+        olong = nodeDict[str(t[1])].get_long()
+        dlat = nodeDict[str(t[2])].get_lat()
+        dlong = nodeDict[str(t[2])].get_long()
+        outdict[(olat,olong)] +=1
+        outdict[(dlat,dlong)] +=1
+    return outdict
+
+
 
 def load_gtraffic(edgeDict):
     traffic = pd.read_csv('googlemaps_data_full.csv').values.tolist()
@@ -85,7 +102,7 @@ def load_gtraffic(edgeDict):
         edgeDict[(str(t[1]),str(t[0]))].duration = t[5]
         edgeDict[(str(t[1]),str(t[0]))].congested_duration = t[6]
 
-def createClusterDict(clusterData, allOD, nodes):
+def createClusterDict(clusterarr, kmean_input, nodes,outstr,nclusters):
     print('assigning clusters to nodes')
     clusterDict = {}
     cDict = {}
@@ -95,10 +112,14 @@ def createClusterDict(clusterData, allOD, nodes):
     for n in nodes.values():
         #print(i)
         #clusterDict[(allOD[i][0],allOD[i][1])] = clusterData[i]
-        pos = allOD.index(n.get_coords_tup())
-        clusterDict[n.get_ID()] = clusterData[pos]
+        pos = kmean_input.index(n.get_coords_tup())
+        clusterDict[n.get_ID()] = [n.get_lat(),n.get_long(),clusterarr[pos]]
         #clusterDict[cDict[(allOD[i][0],allOD[i][1])]] = clusterData[i]
-    pd.DataFrame.from_dict(clusterDict, orient="index").to_csv("clusterDict.csv")
+    pd.DataFrame.from_dict(clusterDict, orient="index", columns = [\
+                                          'lat'\
+                                          ,'long'\
+                                          ,'cluster'])\
+                        .to_csv("CLUSTERS\\clusterDict_"+outstr+str(nclusters)+".csv")
     #with open("clusterDict.json", "w") as outfile:  
         #json.dump(clusterDict, outfile)
     #for n in nodes.keys():
@@ -108,14 +129,14 @@ def createClusterDict(clusterData, allOD, nodes):
     #        nodes[n].cluster = clusterDict[c]
     return clusterDict
 #(nodes,edges) = ATXxmlparse.getNetworkTopo('')
-def PUDOtoNetwork(centroids,nodes):
+def PUDOtoNetwork(centroids,nodes, outstr, nclusters):
     print('mapping PUDOs (cluster centroids) to network nodes')
     outlist = []
     for c in centroids:
         node = bruteCoord((c[0],c[1]),nodes)
         #print(node)
-        outlist.append([nodes[node].get_ID(), nodes[node].get_coords_tup()])
-    pd.DataFrame(outlist).to_csv("network_PUDOs.csv",index = False)
+        outlist.append([nodes[node].get_ID(), nodes[node].get_lat(), nodes[node].get_long()])
+    pd.DataFrame(outlist, columns = ['id','lat','long']).to_csv("PUDOS\\network_PUDOs"+outstr+str(nclusters)+".csv",index = False)
     return outlist
 def coordToNetwork(coord,truncDict, rndDict):
     #matches a coordinate to the indexed lists
@@ -193,13 +214,43 @@ def coordinateMatchTrips(trips):
         pd.DataFrame(trip_coord_map).to_csv('coordTrips.csv', index = False)
     return trip_coord_map
 
+def calc_centroid(clusterDict,nclusters):
+    outlist = []
+    for clus in range(nclusters):
+        sumlat = 0
+        sumlong = 0
+        ct = 0
+        #print('DEBUG cluster',clus)
+        for n in clusterDict.keys():
+            #print('DEBUG',clusterDict[n][2], clus)
+            if clusterDict[n][2] == clus:
+                ct+=1
+                sumlat += nodeDict[str(n)].get_lat()
+                sumlong += nodeDict[str(n)].get_long()
+        outlist.append((sumlat/ct,sumlong/ct))
+    return outlist
 
-#(nodeDict,edgeDict) = ATXxmlparse.getSDBNetworkTopo()
-#tripData = getTripData('')
-#rndDict, truncDict = dictIndexCoords(nodeDict)
-#coordTrips = coordinateMatchTrips(tripData)
-#ALLOD = allOD(tripData)
-#kmd = run_kmeans(ALLOD)
-#clusterDict = createClusterDict(kmd[1],ALLOD, nodeDict)
-#PUDOlist= PUDOtoNetwork(kmd[0],nodeDict)
-#nodedTripList = nodedTripList(coordTrips)
+def load_all():
+    (nodeDict,edgeDict) = ATXxmlparse.getSDBNetworkTopo()
+    tripData = getTripData('')
+    #rndDict, truncDict = dictIndexCoords(nodeDict)
+    #coordTrips = coordinateMatchTrips(tripData)
+    #nodedTripList = nodedTripList(coordTrips)
+    ALLOD = allOD(tripData)
+    trip_weight_nodes = trip_weighted_node_coord(tripList)
+    return ALLOD, trip_weight_nodes, nodeDict, edgeDict
+def gen_communities():
+    ALLOD, trip_weight_nodes, nodeDict, edgeDict = load_all()
+    for nclusters in range(500,2750,250):
+        print('clustercount',nclusters, datetime.now())
+        #print('running kmeans1', datetime.now())
+        #kmd = run_kmeans(ALLOD, nclusters)
+        print('running kmeans weighted', datetime.now())
+        kmw = kmean_weighted(trip_weight_nodes,nclusters)
+        print('creating clusterdicts', datetime.now())
+        #clusterDict = createClusterDict(kmd[1],ALLOD, nodeDict,'kmean_rawtrips', nclusters)
+        clusterDict_w = createClusterDict(kmw,list(trip_weight_nodes.keys()), nodeDict, 'kmean_nodeweight',nclusters)        
+        centroids_w = calc_centroid(clusterDict_w, nclusters)
+        print('creating pudolists')
+        #PUDOlist= PUDOtoNetwork(kmd[0],nodeDict,'kmean_rawtrips',nclusters)
+        PUDOlist_w = PUDOtoNetwork(centroids_w, nodeDict,'kmean_nodeweight',nclusters)
