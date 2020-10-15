@@ -3,10 +3,10 @@
 "tripXML": "F:\\Austin_Multimodal\\revised_austin_plans\\revised_austin_plans.xml",
 "networkXML":"F:\\Austin_Multimodal\\austin_multimodalnetwork\\austin_multimodalnetwork.xml",
 "ridesharing":"no",
-"numvehicles":10000,
+"numvehicles":20000,
 "numtrips":10,
-"vehiclesperpudo":10,
-"eventlimit":1000000,
+"vehiclesperpudo":20,
+"eventlimit":100000,
 "runids":["kmean_rawtrips","kmean_nodeweight","async","async_congest","nopudo"],
 "clustercounts":["500","750","1000","1250","1500","1750","2000",""]
 

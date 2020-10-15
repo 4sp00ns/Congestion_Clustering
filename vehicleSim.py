@@ -641,16 +641,17 @@ def masterEventHandler(event, schedule):
     else:
         print('unhandled event type')
         print(event.get_eType())
-    reporting = eventReport(event, False, "","")
+    reporting = eventReport(event, False, "","","")
     return schedule
-def eventReport(event, write, runid, ncluster):
+def eventReport(event, write, runid, ncluster, idle):
     
     if write == True:
         out_df = pd.DataFrame(reporting, columns = ['time','type','ID','hail_time'\
                                               ,'arrival_time','vehicle_time','origin'\
                                               ,'destination','oPUDO','dPUDO','route'\
                                               ,'VMT','origin_walk','dest_walk','total_walk'])
-        out_df.to_csv('REPORTING\\reporting_' + runid + ncluster + '.csv')
+        out_df.to_csv('REPORTING\\reporting_' + runid + '_c' + ncluster + '_v'+str(config["numvehicles"])+ '.csv')
+        idle_df = pd.DataFrame(idle, columns = ['time','vehicles_at_PUDOs','vehicles_enroute','vehicles reallocating','num_rideshares'])
         return reporting
     #if event.get_eType() in ['Ride','Arrival','Reallocation']
     obj = event.get_eObj()
@@ -685,13 +686,33 @@ def eventReport(event, write, runid, ncluster):
            ,ttl_walk\
            ]
     reporting.append(out)
-    return reporting         
-def stateReport(verbose):
-    #this will first function as a series of debug checks to ensure the model is working correctly
-    idleVehicles = 0
-    for p in PUDOs.values():
-        idleVehicles += p.get_capacity()
-    print("# idle vehicles", idleVehicles)
+    return reporting      
+   
+def stateReport(verbose, schedule, idle, event):
+    currEnroute = 0
+    currRealloc = 0
+    currRideshare = 0
+    for sch in schedule.keys():
+        if sch[1] == 'Arrival':
+            currEnroute += 1 
+        if sch[1] == 'Reallocation':
+            currRealloc += 1
+        if sch[1] == 'Rideshare':
+            currRideshare += 1
+    pv = 0
+    for pp in PUDOs.values():
+        if pp.get_capacity() < 0:
+            print('capacity negative at', pp.get_ID())
+            return (enrouteDict, schedule, event, idle)
+        pv += pp.get_capacity()
+    ttl = pv + currEnroute + currRealloc
+    if verbose == True:
+        print('DEBUG: active + realloc vehicles', currEnroute, currRealloc)
+        print('vehicles at PUDOs',pv)
+        print('total vehicles = ',ttl)
+    idle.append([event.get_eTime(), pv, currEnroute, currRealloc, currRideshare])
+    return pv, ttl, idle
+
 def getNextEvent(schedule):
     #time = min(s, key=s.get.get_eOBJ
     time = min(list(schedule.keys()), key = lambda t: t[0])
@@ -700,6 +721,7 @@ def getNextEvent(schedule):
     return event, schedule#, delta_t
 
 def simMaster():
+    idle = []
     global reporting
     reporting = []
     tripct = 0
@@ -721,35 +743,22 @@ def simMaster():
             #print('')
             print(event.get_eTime(), event.get_eType(), event.get_eObj().get_ID(), 'elapsed:', elapsed)
             schedule = masterEventHandler(event, schedule)
-            schedule, relocnum = reallocateVehicles(schedule, event.get_eTime(),relocnum)
+            
 
-            currEnroute = 0
-            currRealloc = 0
-            for sch in schedule.keys():
-                if sch[1] == 'Arrival':
-                    currEnroute += 1 
-                if sch[1] == 'Reallocation':
-                    currRealloc += 1
-            print('DEBUG: active + realloc vehicles', currEnroute, currRealloc)
-            print('DEBUG: enroutevehicles:',len(enrouteDict))
-            pv = 0
-            for pp in PUDOs.values():
-                if pp.get_capacity() < 0:
-                    print('capacity negative at', pp.get_ID())
-                    return (enrouteDict, schedule, event)
-                pv += pp.get_capacity()
-            print('vehicles at PUDOs',pv)
-            print('total vehicles = ',pv + currEnroute + currRealloc)
-
-            if pv + currEnroute + currRealloc < 4999:
-                return (enrouteDict, schedule, event)
-            stateReport(True)
+            pv, ttl, idle = stateReport(True, schedule, idle, event)
+            if pv / len(PUDOs) > 2:
+                #only reallocate if the number of idle vehicles is twice the number of PUDOs
+                schedule, relocnum = reallocateVehicles(schedule, event.get_eTime(),relocnum)
+            if ttl < config["numvehicles"]-1:
+                print('missing vehicles, killing sim')
+                return (enrouteDict, schedule, event, idle)
+            #stateReport(True)
     except Exception as e:
         print(e)
         traceback.print_exc()
-        return(enrouteDict, schedule, event)
-    eventReport(None, True, runid, ncluster)
-    return (enrouteDict, schedule, None)
+        return(enrouteDict, schedule, event, idle)
+    eventReport(None, True, runid, ncluster, idle)
+    return (enrouteDict, schedule, None, idle)
 
         
     
