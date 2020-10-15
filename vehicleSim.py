@@ -557,7 +557,7 @@ def reallocateVehicles(schedule, currTime, relocnum):
         #vCount[it] = [sum(vCount[it])/len(vCount[it]),sum(vCount[it][:-1])/len(vCount[it][:-1]), sum(vCount[it]), len(vCount[it])]
         vCount2[it] = [vCount[it]\
                         , sum(vCount[it])\
-                        , len(vCount[it])\
+                        , len(vCount[it])-1\
                         , sum(vCount[it][:-1])]
         vCount2[it].append(vCount2[it][1]/vCount2[it][2])
         vCount2[it].append(vCount2[it][3]/(vCount2[it][2]-1))
@@ -723,27 +723,27 @@ def simMaster():
             schedule = masterEventHandler(event, schedule)
             schedule, relocnum = reallocateVehicles(schedule, event.get_eTime(),relocnum)
 
-#            currEnroute = 0
-#            currRealloc = 0
-#            for sch in schedule.keys():
-#                if sch[1] == 'Arrival':
-#                    currEnroute += 1 
-#                if sch[1] == 'Reallocation':
-#                    currRealloc += 1
-#            print('DEBUG: active + realloc vehicles', currEnroute, currRealloc)
-            #print('DEBUG: enroutevehicles:',len(enrouteDict))
-#            pv = 0
-#            for pp in PUDOs.values():
-#                if pp.get_capacity() < 0:
-#                    print('capacity negative at', pp.get_ID())
-#                    return (enrouteDict, schedule, event)
-#                pv += pp.get_capacity()
-#            print('vehicles at PUDOs',pv)
-#            print('total vehicles = ',pv + currEnroute + currRealloc)
-            #br = input()
-#            if pv + currEnroute + currRealloc < 4999:
-#                return (enrouteDict, schedule, event)
-            #stateReport(True)
+            currEnroute = 0
+            currRealloc = 0
+            for sch in schedule.keys():
+                if sch[1] == 'Arrival':
+                    currEnroute += 1 
+                if sch[1] == 'Reallocation':
+                    currRealloc += 1
+            print('DEBUG: active + realloc vehicles', currEnroute, currRealloc)
+            print('DEBUG: enroutevehicles:',len(enrouteDict))
+            pv = 0
+            for pp in PUDOs.values():
+                if pp.get_capacity() < 0:
+                    print('capacity negative at', pp.get_ID())
+                    return (enrouteDict, schedule, event)
+                pv += pp.get_capacity()
+            print('vehicles at PUDOs',pv)
+            print('total vehicles = ',pv + currEnroute + currRealloc)
+
+            if pv + currEnroute + currRealloc < 4999:
+                return (enrouteDict, schedule, event)
+            stateReport(True)
     except Exception as e:
         print(e)
         traceback.print_exc()
