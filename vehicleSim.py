@@ -28,6 +28,7 @@ class Ride(object):
         self.dPUDO = dPUDO
         self.arrival_time = 0
         self.route = []
+        self.dropped = False
     def get_ID(self):
         return self.ID
     def get_hail_time(self):
@@ -44,6 +45,8 @@ class Ride(object):
         return self.dPUDO
     def get_route(self):
         return self.route
+    def get_dropped(self):
+        return self.dropped
     
 class PUDO(object):
     def __init__(self, node, cluster, capacity):
@@ -378,7 +381,12 @@ def findNearestVehicle(ride, schedule):
     nearbyPUDOs = findPUDO(nodeDict[ride.get_origin()])
     currlen = 0
     while max(list(map(lambda nearbyPUDOs: nearbyPUDOs.get_capacity(), nearbyPUDOs))) == 0:
-        print('DEBUG no vehicles at adj level',currlen,'extending search')
+#        print('DEBUG no vehicles at adj level',currlen,'extending search')
+        if currlen > config["numpudos"]/2:
+            #more than half the system has been searched, terminating vehicle search and dropping ride
+            print('Dropping Ride')
+            ride.dropped = True
+            return schedule
         for np in nearbyPUDOs[currlen:]:
             currlen += 1
             newPUDOs = findPUDO(nodeDict[np.get_ID()])
@@ -464,7 +472,7 @@ def rideshareLogic(ride, schedule):
             if dCluster in adjClusters or nodeDict[route[-1:][0]].get_cluster() in rideClusters:
                 ###If either the ride destination cluster lies adjacent to the untraveled portion###
                 ###or the route destination lies adjacent to the requested rides route clusters###
-                print('found a compatible route', rkey)
+#                print('found a compatible route', rkey)
                 #remove existing arrival
                 if 'reloc' in str(enroute.get_ID()):
                     schedule.pop((enroute.get_arrival_time(),'Reallocation',enroute.get_ID()))
@@ -475,7 +483,7 @@ def rideshareLogic(ride, schedule):
                 rideDiversion = shortestPath(vehicle_loc, ride.get_oPUDO().get_ID())
                 #calculate new route and route extension, depending on whom is dropped off first
                 if dCluster in adjClusters:
-                    print('within curr rout')
+#                    print('within curr rout')
                     #if the current route contains both origin and destination the rideshare is dropped first
                     #new rider pickup to new ride destination
                     newRoute = shortestPath(ride.get_oPUDO().get_ID(), ride.get_dPUDO().get_ID())
@@ -500,7 +508,7 @@ def rideshareLogic(ride, schedule):
                     schedule[(firstArrival,'Rideshare',ride.get_ID())] = Event(firstArrival,'Rideshare',ride)
                     schedule[(finalArrival, 'Arrival',enroute.get_ID())] = Event(finalArrival, 'Arrival',enroute)
                 elif nodeDict[route[-1:][0]].get_cluster() in rideClusters:
-                    print('route extend')
+#                    print('route extend')
                     #if the rideshare requires extending the current route the current rider is dropped first
                     
                     #new rider pickup to current route destination:
@@ -566,10 +574,10 @@ def reallocateVehicles(schedule, currTime, relocnum):
         if vCount2[macroCluster][4] < 1:
             needs_vehicles.append(macroCluster)
             ###this cluster needs vehicles###
-            print('found an area that needs vehicles', macroCluster)
+#            print('found an area that needs vehicles', macroCluster)
     for macroCluster in needs_vehicles:        
         overCapCluster = max(vCount2.keys(), key=(lambda key: vCount2[key][5]))
-        print('cluster with most available vehicles is', overCapCluster)
+#        print('cluster with most available vehicles is', overCapCluster)
         for pp in PUDOs.values():
             if pp.get_cluster() in adjDict[overCapCluster] and pp.get_capacity() > 0:
                 #print('found opudo', pp.get_ID())
@@ -608,7 +616,7 @@ def masterEventHandler(event, schedule):
         #print('handling it')
         pass
         #run reporting for the event here
-    elif event.get_eType() == 'Arrival':
+    elif event.get_eType() == 'Arrival' or event.get_eType() == 'Reallocation':
         #print('DEBUG EOBJ', event.get_eObj())
         event.get_eObj().dPUDO.capacity +=1
         #nodeDict[str(event.get_eObj().get_dPUDO().get_ID())].PUDO.capacity +=1
@@ -631,17 +639,12 @@ def masterEventHandler(event, schedule):
         schedule = assignVehicle(ride, schedule)#,enrouteList)
         #enrouteDict[ride.get_hail_time()] = ride.get_route()
         schedule = createSchedule(schedule, 1)
-    elif event.get_eType() == 'Reallocation':
-        event.get_eObj().dPUDO.capacity +=1
-        try:
-            enrouteDict.pop((event.get_eObj().get_hail_time(), event.get_eObj().get_ID()))
-        except:
-            print('rideshare vehicle, not in enroute dict')
-        pass
     else:
         print('unhandled event type')
         print(event.get_eType())
-    reporting = eventReport(event, False, "","","")
+    if event.get_eObj().get_dropped() == True:
+        event.eType = 'Dropped'
+    eventReport(event, False, "","","")
     return schedule
 def eventReport(event, write, runid, ncluster, idle):
     
@@ -651,7 +654,12 @@ def eventReport(event, write, runid, ncluster, idle):
                                               ,'destination','oPUDO','dPUDO','route'\
                                               ,'VMT','origin_walk','dest_walk','total_walk'])
         out_df.to_csv('REPORTING\\reporting_' + runid + '_c' + ncluster + '_v'+str(config["numvehicles"])+ '.csv')
+        formatted_df = format_df(out_df)
+        formatted_df.to_csv('REPORTING\\aggreport' + runid + '_c' + ncluster + '_v'+str(config["numvehicles"])+ '.csv')
         idle_df = pd.DataFrame(idle, columns = ['time','vehicles_at_PUDOs','vehicles_enroute','vehicles reallocating','num_rideshares'])
+        idle_df["minute"] = idle_df.time.dt.hour*60 + idle_df.time.dt.minute
+        idle_df = idle_df.groupby(['minute']).mean()
+        idle_df.to_csv('REPORTING\\vreport_' + runid + '_c' + ncluster + '_v'+str(config["numvehicles"])+ '.csv')
         return reporting
     #if event.get_eType() in ['Ride','Arrival','Reallocation']
     obj = event.get_eObj()
@@ -686,8 +694,11 @@ def eventReport(event, write, runid, ncluster, idle):
            ,ttl_walk\
            ]
     reporting.append(out)
-    return reporting      
-   
+def format_df(df):
+    df['minute'] = df.time.dt.hour*60 + df.time.dt.minute
+    #df = df[["minute","type"]]
+    df = df.groupby(['minute','type']).mean()
+    return df
 def stateReport(verbose, schedule, idle, event):
     currEnroute = 0
     currRealloc = 0
@@ -703,7 +714,7 @@ def stateReport(verbose, schedule, idle, event):
     for pp in PUDOs.values():
         if pp.get_capacity() < 0:
             print('capacity negative at', pp.get_ID())
-            return (enrouteDict, schedule, event, idle)
+            return (enrouteDict, schedule, event, idle) 
         pv += pp.get_capacity()
     ttl = pv + currEnroute + currRealloc
     if verbose == True:
@@ -728,7 +739,7 @@ def simMaster():
     global config
     relocnum = 0
     config = getConfig()
-    runid, ncluster = config["runids"][1], config["clustercounts"][2]
+    runid, ncluster = config["runids"][1], config["clustercounts"][6]
     PUDOList = readData(runid, ncluster)
     schedule = {}
     PUDOs, schedule = createDataStructures(PUDOList, schedule)
@@ -745,7 +756,7 @@ def simMaster():
             schedule = masterEventHandler(event, schedule)
             
 
-            pv, ttl, idle = stateReport(True, schedule, idle, event)
+            pv, ttl, idle = stateReport(False, schedule, idle, event)
             if pv / len(PUDOs) > 2:
                 #only reallocate if the number of idle vehicles is twice the number of PUDOs
                 schedule, relocnum = reallocateVehicles(schedule, event.get_eTime(),relocnum)

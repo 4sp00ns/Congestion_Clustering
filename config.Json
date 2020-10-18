@@ -5,9 +5,10 @@
 "ridesharing":"no",
 "numvehicles":20000,
 "numtrips":10,
-"vehiclesperpudo":20,
-"eventlimit":100000,
+"vehiclesperpudo":10,
+"eventlimit":1000000,
 "runids":["kmean_rawtrips","kmean_nodeweight","async","async_congest","nopudo"],
-"clustercounts":["500","750","1000","1250","1500","1750","2000",""]
-
+"clustercounts":["500","750","1000","1250","1500","1750","2000",""],
+"numpudos":2000,
+"runtimes":"20k 1k 14:45, 20k 2k, 20:06"
 }
