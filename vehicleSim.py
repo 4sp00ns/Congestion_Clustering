@@ -175,7 +175,7 @@ def getConfig():
     with open(cwd+r'\config.json') as f:
         config = json.load(f)            
     return config        
-def readData(outstr, ncluster):
+def readData(clusterid, pudoid):
     #load trip data
     #load pudo locations
     #load clusters
@@ -206,13 +206,13 @@ def readData(outstr, ncluster):
     tripList.sort(key=lambda x: x[0])
     tripWeightedNodes = tripweight_nodes(tripList)
 
-    clusterList = pd.read_csv('CLUSTERS\\clusterDict_'+outstr+str(ncluster)+'.csv'\
+    clusterList = pd.read_csv('CLUSTERS\\'+clusterid+'.csv'\
                               ,dtype = {'id':np.int\
                                         ,'lat':np.float64\
                                         ,'long':np.float64\
                                         ,'cluster':np.int})\
                             .values.tolist()
-    PUDOList = pd.read_csv('PUDOS\\network_PUDOs'+outstr+str(ncluster)+'.csv'\
+    PUDOList = pd.read_csv('PUDOS\\'+pudoid+'.csv'\
                            ,dtype = {'id':np.int\
                                      ,'lat':np.float64\
                                      ,'long':np.float64})\
@@ -644,22 +644,22 @@ def masterEventHandler(event, schedule):
         print(event.get_eType())
     if event.get_eObj().get_dropped() == True:
         event.eType = 'Dropped'
-    eventReport(event, False, "","","")
+    eventReport(event, False, "","")
     return schedule
-def eventReport(event, write, runid, ncluster, idle):
+def eventReport(event, write, runid, idle):
     
     if write == True:
         out_df = pd.DataFrame(reporting, columns = ['time','type','ID','hail_time'\
                                               ,'arrival_time','vehicle_time','origin'\
                                               ,'destination','oPUDO','dPUDO','route'\
                                               ,'VMT','origin_walk','dest_walk','total_walk'])
-        out_df.to_csv('REPORTING\\reporting_' + runid + '_c' + ncluster + '_v'+str(config["numvehicles"])+ '.csv')
+        out_df.to_csv('REPORTING\\reporting_' + runid + '_v'+str(config["numvehicles"])+ '.csv')
         formatted_df = format_df(out_df)
-        formatted_df.to_csv('REPORTING\\aggreport' + runid + '_c' + ncluster + '_v'+str(config["numvehicles"])+ '.csv')
+        formatted_df.to_csv('REPORTING\\aggreport' + runid + '_v'+str(config["numvehicles"])+ '.csv')
         idle_df = pd.DataFrame(idle, columns = ['time','vehicles_at_PUDOs','vehicles_enroute','vehicles reallocating','num_rideshares'])
         idle_df["minute"] = idle_df.time.dt.hour*60 + idle_df.time.dt.minute
         idle_df = idle_df.groupby(['minute']).mean()
-        idle_df.to_csv('REPORTING\\vreport_' + runid + '_c' + ncluster + '_v'+str(config["numvehicles"])+ '.csv')
+        idle_df.to_csv('REPORTING\\vreport_' + runid + '_v'+str(config["numvehicles"])+ '.csv')
         return reporting
     #if event.get_eType() in ['Ride','Arrival','Reallocation']
     obj = event.get_eObj()
@@ -739,8 +739,10 @@ def simMaster():
     global config
     relocnum = 0
     config = getConfig()
-    runid, ncluster = config["runids"][1], config["clustercounts"][6]
-    PUDOList = readData(runid, ncluster)
+    runid = 'test_pudocluster_mismatch'
+    #runid, ncluster = config["runids"][3], config["clustercounts"][6]
+    clusterid, pudoid = 'clusterDict_kmean_nodeweight2000','network_PUDOsnoPUDO'
+    PUDOList = readData(clusterid, pudoid)
     schedule = {}
     PUDOs, schedule = createDataStructures(PUDOList, schedule)
     init_time = dt.datetime.now()
@@ -768,7 +770,7 @@ def simMaster():
         print(e)
         traceback.print_exc()
         return(enrouteDict, schedule, event, idle)
-    eventReport(None, True, runid, ncluster, idle)
+    eventReport(None, True, runid, idle)
     return (enrouteDict, schedule, None, idle)
 
         
