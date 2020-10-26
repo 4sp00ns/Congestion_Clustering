@@ -241,7 +241,8 @@ def load_all():
     return ALLOD, trip_weight_nodes, nodeDict, edgeDict
 def gen_communities():
     ALLOD, trip_weight_nodes, nodeDict, edgeDict = load_all()
-    for nclusters in range(500,2750,250):
+    trip_weight_nodes = prune_nodedict_to_urban_core(trip_weight_nodes)
+    for nclusters in range(20,100,20):
         print('clustercount',nclusters, datetime.now())
         #print('running kmeans1', datetime.now())
         #kmd = run_kmeans(ALLOD, nclusters)
@@ -249,8 +250,19 @@ def gen_communities():
         kmw = kmean_weighted(trip_weight_nodes,nclusters)
         print('creating clusterdicts', datetime.now())
         #clusterDict = createClusterDict(kmd[1],ALLOD, nodeDict,'kmean_rawtrips', nclusters)
-        clusterDict_w = createClusterDict(kmw,list(trip_weight_nodes.keys()), nodeDict, 'kmean_nodeweight',nclusters)        
+        clusterDict_w = createClusterDict(kmw,list(trip_weight_nodes.keys()), nodeDict, 'kmean_uc',nclusters)        
         centroids_w = calc_centroid(clusterDict_w, nclusters)
         print('creating pudolists')
         #PUDOlist= PUDOtoNetwork(kmd[0],nodeDict,'kmean_rawtrips',nclusters)
-        PUDOlist_w = PUDOtoNetwork(centroids_w, nodeDict,'kmean_nodeweight',nclusters)
+        PUDOlist_w = PUDOtoNetwork(centroids_w, nodeDict,'kmean_uc',nclusters)
+        
+#####will just handle this in the sim I guess?
+#def prune_nodedict_to_urban_core(any_dict):
+#    uc_list = pd.read_csv('urban_core_nodes.csv').values.tolist()
+#    newdict = {}
+#    for uc in uc_list:
+#        newdict[(uc[2],uc[3])] = 0
+#    for coord in any_dict.keys():
+#        if coord in newdict.keys():
+#            newdict[coord] = any_dict[coord]
+#    return newdict 
