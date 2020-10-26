@@ -115,3 +115,23 @@ def distantNodes():
                     .to_csv('PUDOS\\eligible_nodes.csv',index=False)
     return ct
         
+def reducedNodes():
+    outL = []
+    outN = []
+    edgect = 0
+    tripct = 0
+    for n in nodeDict.keys():
+        node = nodeDict[n]
+        if node.get_lat() > 30.25 and node.get_lat() < 30.29:
+            if node.get_long() < -97.73 and node.get_long() > -97.75:
+                outL.append([n, node.get_lat(), node.get_long()])
+                outN.append(n)
+    for e in edgeDict.values():
+        if e.get_head() in outN:
+            edgect+=1
+    for t in tripList:
+        if str(t[1]) in outN or str(t[2]) in outN:
+            tripct+=1
+    pd.DataFrame(outL, columns=['id','lat','long'])\
+                .to_csv('urban_core_nodes.csv')
+    return outL, edgect, tripct
