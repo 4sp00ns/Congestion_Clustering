@@ -381,8 +381,8 @@ def findNearestVehicle(ride, schedule):
     nearbyPUDOs = findPUDO(nodeDict[ride.get_origin()])
     currlen = 0
     while max(list(map(lambda nearbyPUDOs: nearbyPUDOs.get_capacity(), nearbyPUDOs))) == 0:
-#        print('DEBUG no vehicles at adj level',currlen,'extending search')
-        if currlen > config["numpudos"]/2:
+        print('DEBUG no vehicles at adj level',currlen,'extending search')
+        if currlen > len(PUDOs)/2:
             #more than half the system has been searched, terminating vehicle search and dropping ride
             print('Dropping Ride')
             ride.dropped = True
@@ -562,7 +562,8 @@ def reallocateVehicles(schedule, currTime, relocnum):
     #convert vCount to a ratio of vehicles to PUDOs (normalize)
     vCount2 = {}
     for it in vCount.keys():
-        #vCount[it] = [sum(vCount[it])/len(vCount[it]),sum(vCount[it][:-1])/len(vCount[it][:-1]), sum(vCount[it]), len(vCount[it])]
+        ###list, sum vehicles, number of PUDOs (excl enroute entry in vcount), num onsite vehicles, v/p ttl, v/p onsite
+        ###v/p total used to assess need, v/p onsite used to assess availability
         vCount2[it] = [vCount[it]\
                         , sum(vCount[it])\
                         , len(vCount[it])-1\
@@ -574,10 +575,10 @@ def reallocateVehicles(schedule, currTime, relocnum):
         if vCount2[macroCluster][4] < 1:
             needs_vehicles.append(macroCluster)
             ###this cluster needs vehicles###
-#            print('found an area that needs vehicles', macroCluster)
+            print('found an area that needs vehicles', macroCluster)
     for macroCluster in needs_vehicles:        
         overCapCluster = max(vCount2.keys(), key=(lambda key: vCount2[key][5]))
-#        print('cluster with most available vehicles is', overCapCluster)
+        print('cluster with most available vehicles is', overCapCluster)
         for pp in PUDOs.values():
             if pp.get_cluster() in adjDict[overCapCluster] and pp.get_capacity() > 0:
                 #print('found opudo', pp.get_ID())
@@ -718,7 +719,7 @@ def stateReport(verbose, schedule, idle, event):
         pv += pp.get_capacity()
     ttl = pv + currEnroute + currRealloc
     if verbose == True:
-        print('DEBUG: active + realloc vehicles', currEnroute, currRealloc)
+        print('DEBUG: active, realloc, rideshare vehicles', currEnroute, currRealloc, currRideshare)
         print('vehicles at PUDOs',pv)
         print('total vehicles = ',ttl)
     idle.append([event.get_eTime(), pv, currEnroute, currRealloc, currRideshare])
@@ -758,14 +759,14 @@ def simMaster():
             schedule = masterEventHandler(event, schedule)
             
 
-            pv, ttl, idle = stateReport(False, schedule, idle, event)
+            pv, ttl, idle = stateReport(True, schedule, idle, event)
             if pv / len(PUDOs) > 2:
                 #only reallocate if the number of idle vehicles is twice the number of PUDOs
                 schedule, relocnum = reallocateVehicles(schedule, event.get_eTime(),relocnum)
             if ttl < config["numvehicles"]-1:
                 print('missing vehicles, killing sim')
                 return (enrouteDict, schedule, event, idle)
-            #stateReport(True)
+
     except Exception as e:
         print(e)
         traceback.print_exc()
