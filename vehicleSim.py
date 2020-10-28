@@ -60,7 +60,7 @@ class PUDO(object):
     def get_capacity(self):
         return self.capacity
     def get_ID(self):
-        return self.get_node().get_ID()
+        return self.node.get_ID()
         
 #class Node(object):
 #    def __init__(self, ID, lat, long, cluster):
@@ -266,7 +266,7 @@ def createNetwork():
             ATXnet.add_edge(e[0],e[1],weight=float(edgeDict[e].get_duration()))
             ATXcongest.add_edge(e[0],e[1],weight=float(edgeDict[e].get_congested_duration()))
     #return ATXnet
-def initVehicles(numvehicles):
+def initVehicles(PUDOs, numvehicles):
     plist = list(PUDOs.values())
     random_to_deploy = numvehicles%len(PUDOs)
     fixed_per_pudo = numvehicles//len(PUDOs)
@@ -275,7 +275,6 @@ def initVehicles(numvehicles):
         p.capacity = fixed_per_pudo
     for n in range(random_to_deploy):
         np.random.choice(plist).capacity +=1
-        print('adding vehicle to PUDO',PUDO.get_ID())
     return PUDOs
 def buildPUDOs(PUDOList):
     print('building PUDOs')
@@ -286,7 +285,7 @@ def buildPUDOs(PUDOList):
         station = PUDO(node, node.get_cluster(),0)
         nodeDict[str(int(p[0]))].PUDO = station
         PUDOs[str(int(p[0]))] = station
-    PUDOs = initVehicles(config["numvehicles"])
+    PUDOs = initVehicles(PUDOs, config["numvehicles"])
         #clusterPUDOs[node.get_cluster()].append(station)
         #PUDOs.append(PUDO(p[o], clusterDict[p[0]],[]))
         
@@ -298,12 +297,6 @@ def buildPUDOs(PUDOList):
 #    pd.DataFrame(writelist).to_csv('debugpudos.csv')
     return PUDOs
 
-def init_veh(node):
-    sumw = 0
-    for n in nodeDict.values():
-        if n.get_cluster() == node.get_cluster():
-            sumw += tripWeightedNodes[int(n.get_ID())]
-    return int(round(sumw*config["numvehicles"]))
     #get nodes in cluster
     #sum their weights
     #multiple by vehicle total in config
