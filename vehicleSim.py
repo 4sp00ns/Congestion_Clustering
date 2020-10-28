@@ -226,9 +226,14 @@ def createDataStructures(PUDOList, schedule):
     createNetwork()
     #nodeDict['3640042034'].cluster = 43
     #nodeDict['151437669'].cluster = 43
-    global adjDict, PUDOs, enrouteDict
+    global adjDict, PUDOs, enrouteDict,clusterPUDOs
     adjDict = getClusterAdjacencies()
+    clusterPUDOs = {}
+    for aj in adjDict.keys():
+        clusterPUDOs[aj] = []
     PUDOs = buildPUDOs(PUDOList)
+    for pu in PUDOs.values():
+        clusterPUDOs[pu.get_cluster()].append(pu)
     schedule = createSchedule(schedule, config["numtrips"])
     enrouteDict = {}
     return PUDOs, schedule
@@ -261,15 +266,28 @@ def createNetwork():
             ATXnet.add_edge(e[0],e[1],weight=float(edgeDict[e].get_duration()))
             ATXcongest.add_edge(e[0],e[1],weight=float(edgeDict[e].get_congested_duration()))
     #return ATXnet
+def initVehicles(numvehicles):
+    plist = list(PUDOs.values())
+    random_to_deploy = numvehicles%len(PUDOs)
+    fixed_per_pudo = numvehicles//len(PUDOs)
+    print('fixed and random', fixed_per_pudo, random_to_deploy)
+    for p in PUDOs.values():
+        p.capacity = fixed_per_pudo
+    for n in range(random_to_deploy):
+        np.random.choice(plist).capacity +=1
+        print('adding vehicle to PUDO',PUDO.get_ID())
+    return PUDOs
 def buildPUDOs(PUDOList):
     print('building PUDOs')
     PUDOs = {}
     for p in PUDOList:
         ##########WORKING HERE ON DYNAMICALLY ASSIGNING VEHICLES TO PUDOS##########
         node = nodeDict[str(int(p[0]))]
-        station = PUDO(node, node.get_cluster(),config["vehiclesperpudo"])
+        station = PUDO(node, node.get_cluster(),0)
         nodeDict[str(int(p[0]))].PUDO = station
         PUDOs[str(int(p[0]))] = station
+    PUDOs = initVehicles(config["numvehicles"])
+        #clusterPUDOs[node.get_cluster()].append(station)
         #PUDOs.append(PUDO(p[o], clusterDict[p[0]],[]))
         
         ####TEMP FOR DEBUGGING RIDESHARE####
@@ -299,14 +317,22 @@ def createSchedule(schedule, num):
     for t in tripList[:num]:
         #print('schedule',t)
         trip = tripList.pop(0)
+        if str(trip[1]) in PUDOs.keys():
+            opu = PUDOs[str(trip[1])]
+        else:
+            opu = findPUDO(nodeDict[str(trip[1])])[0]
+        if str(trip[2]) in PUDOs.keys():
+            dpu = PUDOs[str(trip[2])]
+        else:
+            dpu = findPUDO(nodeDict[str(trip[2])])[0]
         schedule[(trip[0],'Ride',trip[3])] = Event(trip[0], \
                                 'Ride',\
                                 Ride(trip[3],\
                                      trip[0],\
                                      str(trip[1]),\
                                      str(trip[2]),\
-                                     findPUDO(nodeDict[str(trip[1])])[0],\
-                                     findPUDO(nodeDict[str(trip[2])])[0]))
+                                     opu,\
+                                     dpu))
     return schedule
 
 def getClusterAdjacencies():
@@ -343,9 +369,13 @@ def findPUDO(node):
     nearbyPUDOs = {}
     #cluster = findCluster(clusterDict, node)
     adjClusters = adjDict[node.get_cluster()]
-    for p in PUDOs.values():
-        if p.get_cluster() in adjClusters:
-            nearbyPUDOs[p] = shortestPath(node.get_ID(), p.get_ID())[1]
+    #adjClusters = [node.get_cluster()]
+    while len(nearbyPUDOs) == 0:
+        adjClusters += [np.random.choice(adjDict[node.get_cluster()])]
+        for p in PUDOs.values():
+            if p.get_cluster() in adjClusters:
+                nearbyPUDOs[p] = shortestPath(node.get_ID(), p.get_ID())[1]
+        
     outlist = sorted(nearbyPUDOs, key=nearbyPUDOs.get)
     
 #    minDist = 99999
@@ -378,21 +408,39 @@ def assignVehicle(ride, schedule): #,enrouteDict):
             schedule = findNearestVehicle(ride, schedule)
     return schedule
 def findNearestVehicle(ride, schedule):
-    nearbyPUDOs = findPUDO(nodeDict[ride.get_origin()])
-    currlen = 0
+    nearbyPUDOs = [PUDOs[ride.get_origin()]]#clusterPUDOs[nodeDict[ride.get_origin()].get_cluster()]
+        
+    currlen = len(nearbyPUDOs)
+    print('cluster',nodeDict[ride.get_origin()].get_cluster(),'len nearbypudos',len(nearbyPUDOs))
     while max(list(map(lambda nearbyPUDOs: nearbyPUDOs.get_capacity(), nearbyPUDOs))) == 0:
-        print('DEBUG no vehicles at adj level',currlen,'extending search')
-        if currlen > len(PUDOs)/2:
-            #more than half the system has been searched, terminating vehicle search and dropping ride
-            print('Dropping Ride')
-            ride.dropped = True
-            return schedule
-        for np in nearbyPUDOs[currlen:]:
-            currlen += 1
-            newPUDOs = findPUDO(nodeDict[np.get_ID()])
-            for new in newPUDOs:
-                if new not in nearbyPUDOs:
-                    nearbyPUDOs.append(new)
+         print('DEBUG no vehicles at adj level',currlen,'@',ride.get_origin(),'extending search')
+         
+         newNodes = []
+         p_to_add = []
+         for newp in nearbyPUDOs:
+             
+             newNodes += list(ATXnet[newp.get_ID()])
+             #print('newp and newnodes',newp.get_ID(), len(newNodes))
+             for n in newNodes:
+                 if n in PUDOs.keys()\
+                     and PUDOs[n] not in nearbyPUDOs\
+                     and PUDOs[n] not in p_to_add:
+                     p_to_add.append(PUDOs[n])
+         print('adding these nodes to nearbyPUDOs', len(p_to_add))
+         nearbyPUDOs += p_to_add
+         currlen = len(nearbyPUDOs)          
+
+#        if currlen > len(PUDOs)/2:
+#            #more than half the system has been searched, terminating vehicle search and dropping ride
+#            print('Dropping Ride')
+#            ride.dropped = True
+#            return schedule
+#        for np in nearbyPUDOs[currlen:]:
+#            currlen += 1
+#            newPUDOs = findPUDO(nodeDict[np.get_ID()])
+#            for new in newPUDOs:
+#                if new not in nearbyPUDOs:
+#                    nearbyPUDOs.append(new)
             
     #if no compatible rideshares are found we pull the PUDOs of the adjacent clusters
     
@@ -437,7 +485,8 @@ def rideshareLogic(ride, schedule):
     rideClusters = []
     for nod in ride.get_route():
         ###build a list of clusters adjacent to the requested ride###
-        rideClusters += adjDict[nodeDict[nod].get_cluster()]
+        rideClusters+=adjDict[nodeDict[nod].get_cluster()]
+        ##rideClusters.append(nodeDict[nod].get_cluster()) 
     for rkey in enrouteDict.keys():
         ###for each of the routes currently enroute###
         enroute = enrouteDict[rkey]

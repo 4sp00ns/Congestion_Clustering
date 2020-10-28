@@ -254,7 +254,9 @@ def gen_communities():
         centroids_w = calc_centroid(clusterDict_w, nclusters)
         print('creating pudolists')
         #PUDOlist= PUDOtoNetwork(kmd[0],nodeDict,'kmean_rawtrips',nclusters)
-        PUDOlist_w = PUDOtoNetwork(centroids_w, nodeDict,'kmean_uc',nclusters)
+        
+        ####PUDO SELECTION SHOULD INVOLVE THE RANGE METRIC
+        #PUDOlist_w = PUDOtoNetwork(centroids_w, nodeDict,'kmean_uc',nclusters)
         
 #####will just handle this in the sim I guess?
 #def prune_nodedict_to_urban_core(any_dict):
