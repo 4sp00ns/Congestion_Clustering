@@ -135,3 +135,19 @@ def reducedNodes():
     pd.DataFrame(outL, columns=['id','lat','long'])\
                 .to_csv('urban_core_nodes.csv')
     return outL, edgect, tripct
+
+def build_hybrid_pudos(current_pudofile, current_clusterfile):
+    PUDOList = pd.read_csv('PUDOS\\'+current_+pudofile+'.csv'\
+                       ,dtype = {'id':np.int\
+                                 ,'lat':np.float64\
+                                 ,'long':np.float64})\
+                       .values.tolist()
+    clusterList = pd.read_csv('CLUSTERS\\'+current_clusterfile+'.csv'\
+                          ,dtype = {'id':np.int\
+                                    ,'lat':np.float64\
+                                    ,'long':np.float64\
+                                    ,'cluster':np.int})\
+                        .values.tolist()
+    urban_core = pd.read_csv('urban_core_nodes.csv').values.tolist()
+    
+    

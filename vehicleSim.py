@@ -275,6 +275,7 @@ def initVehicles(PUDOs, numvehicles):
         p.capacity = fixed_per_pudo
     for n in range(random_to_deploy):
         np.random.choice(plist).capacity +=1
+
     return PUDOs
 def buildPUDOs(PUDOList):
     print('building PUDOs')
@@ -422,7 +423,10 @@ def findNearestVehicle(ride, schedule):
          print('adding these nodes to nearbyPUDOs', len(p_to_add))
          nearbyPUDOs += p_to_add
          currlen = len(nearbyPUDOs)          
-
+         if currlen > 1000:
+             print('no vehicle in nearest 1000 nodes, dropping ride')
+             ride.dropped = True
+             return schedule
 #        if currlen > len(PUDOs)/2:
 #            #more than half the system has been searched, terminating vehicle search and dropping ride
 #            print('Dropping Ride')
@@ -434,7 +438,7 @@ def findNearestVehicle(ride, schedule):
 #            for new in newPUDOs:
 #                if new not in nearbyPUDOs:
 #                    nearbyPUDOs.append(new)
-            
+             
     #if no compatible rideshares are found we pull the PUDOs of the adjacent clusters
     
     #walk through adjacent PUDOs (in order of distance) and find nearest PUDO with capacity
@@ -614,43 +618,47 @@ def reallocateVehicles(schedule, currTime, relocnum):
         vCount2[it].append(vCount2[it][3]/(vCount2[it][2]-1))
     needs_vehicles = []
     for macroCluster in vCount2.keys():
-        if vCount2[macroCluster][4] < 1:
+        if vCount2[macroCluster][4] < 1.5:
+            ##shifted to 1.5 to check runtime
             needs_vehicles.append(macroCluster)
             ###this cluster needs vehicles###
             print('found an area that needs vehicles', macroCluster)
-    for macroCluster in needs_vehicles:        
+    for macroCluster in needs_vehicles:
+        oPUDO = 'skip'        
         overCapCluster = max(vCount2.keys(), key=(lambda key: vCount2[key][5]))
         print('cluster with most available vehicles is', overCapCluster)
         for pp in PUDOs.values():
-            if pp.get_cluster() in adjDict[overCapCluster] and pp.get_capacity() > 0:
+            if pp.get_cluster() in adjDict[overCapCluster] and pp.get_capacity() >= 1:
                 #print('found opudo', pp.get_ID())
                 #print(pp.get_cluster(), 'in', adjDict[overCapCluster])
                 oPUDO = pp.get_ID()
                 break
         #print(adjDict[macroCluster])
         for p in PUDOs.values():
-            if p.get_cluster() in adjDict[macroCluster] and p.get_capacity() == 0:
+            if p.get_cluster() in adjDict[macroCluster] and p.get_capacity() <= 1:
                 #print('found dpudo',p.get_ID())
                 #print(p.get_cluster(), 'in', adjDict[macroCluster])
                 dPUDO = p.get_ID()
                 break
         #print('moving vehicle from:',oPUDO,' to ', dPUDO)
-        relocnum += 1        
-        PUDOs[oPUDO].capacity -= 1
-        ride = Ride('reloc'+str(relocnum), currTime, oPUDO, dPUDO, PUDOs[oPUDO], PUDOs[dPUDO])
-        (ride.route, traveltime) = shortestPath(oPUDO, dPUDO)
-        #print('DEBUG realloc traveltime',traveltime, oPUDO, dPUDO)
-        ride.arrival_time = currTime + dt.timedelta(seconds = traveltime)
-        #print('DEBUG for redundant schedule items', (ride.get_arrival_time(),'Reallocation',ride.get_ID()) in list(schedule.keys()))
-        #print('DEBUG', (ride.get_arrival_time(),'Reallocation',ride.get_ID()))
-        schedule[(ride.get_arrival_time(),'Reallocation',ride.get_ID())] = Event(ride.get_arrival_time(), 'Reallocation',ride)
-        enrouteDict[(ride.get_hail_time(), ride.get_ID())] = ride
-        #reduce vehicle count at overcap cluster by 1
-        vCount2[overCapCluster][1] =- 1
-        vCount2[overCapCluster][3] =- 1
-        #recalc vehicles / pudo including excluding the enroute vehicles
-        vCount2[overCapCluster][4] = vCount2[overCapCluster][1]/vCount2[overCapCluster][2]
-        vCount2[overCapCluster][5] = vCount2[overCapCluster][3]/(vCount2[overCapCluster][2]-1)
+        if oPUDO != 'skip':
+            relocnum += 1        
+            PUDOs[oPUDO].capacity -= 1
+            ride = Ride('reloc'+str(relocnum), currTime, oPUDO, dPUDO, PUDOs[oPUDO], PUDOs[dPUDO])
+            (ride.route, traveltime) = shortestPath(oPUDO, dPUDO)
+            #print('DEBUG realloc traveltime',traveltime, oPUDO, dPUDO)
+            ride.arrival_time = currTime + dt.timedelta(seconds = traveltime)
+            #print('DEBUG for redundant schedule items', (ride.get_arrival_time(),'Reallocation',ride.get_ID()) in list(schedule.keys()))
+            #print('DEBUG', (ride.get_arrival_time(),'Reallocation',ride.get_ID()))
+            schedule[(ride.get_arrival_time(),'Reallocation',ride.get_ID())] = Event(ride.get_arrival_time(), 'Reallocation',ride)
+            enrouteDict[(ride.get_hail_time(), ride.get_ID())] = ride
+            #reduce vehicle count at overcap cluster by 1 and adjacent clusters
+            for clus in adjDict[overCapCluster]:
+                vCount2[clus][1] =- 1
+                vCount2[clus][3] =- 1
+                #recalc vehicles / pudo including excluding the enroute vehicles
+                vCount2[clus][4] = vCount2[clus][1]/vCount2[clus][2]
+                vCount2[clus][5] = vCount2[clus][3]/(vCount2[clus][2]-1)
     #print('no vehicles need to be reallocated')
     return schedule, relocnum
 def masterEventHandler(event, schedule):
@@ -782,7 +790,7 @@ def simMaster():
     global config
     relocnum = 0
     config = getConfig()
-    runid = 'test_pudocluster_mismatch'
+    runid = 'test_increase_relocate'
     #runid, ncluster = config["runids"][3], config["clustercounts"][6]
     clusterid, pudoid = 'clusterDict_kmean_nodeweight2000','network_PUDOsnoPUDO'
     PUDOList = readData(clusterid, pudoid)
