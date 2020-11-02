@@ -382,8 +382,8 @@ def findPUDO(node):
     return outlist
 
 def shortestPath(origin, destination):
-    path = nx.astar_path(ATXnet,str(origin),str(destination),weight='weight')
-    distance = nx.astar_path_length(ATXnet,str(origin),str(destination), weight='weight')
+    path = nx.astar_path(dynamic_net,str(origin),str(destination),weight='weight')
+    distance = nx.astar_path_length(dynamic_net,str(origin),str(destination), weight='weight')
     return (path, distance)
 
 def assignVehicle(ride, schedule): #,enrouteDict):
@@ -413,7 +413,7 @@ def findNearestVehicle(ride, schedule):
          p_to_add = []
          for newp in nearbyPUDOs:
              
-             newNodes += list(ATXnet[newp.get_ID()])
+             newNodes += list(dynamic_net[newp.get_ID()])
              #print('newp and newnodes',newp.get_ID(), len(newNodes))
              for n in newNodes:
                  if n in PUDOs.keys()\
@@ -784,10 +784,10 @@ def getNextEvent(schedule):
 
 def simMaster():
     idle = []
-    global reporting
+    global reporting, config, dynamic_net
     reporting = []
     tripct = 0
-    global config
+    #global config
     relocnum = 0
     config = getConfig()
     runid = 'test_increase_relocate'
@@ -797,6 +797,7 @@ def simMaster():
     schedule = {}
     PUDOs, schedule = createDataStructures(PUDOList, schedule)
     init_time = dt.datetime.now()
+    dynamic_net = ATXnet
     try:
         while len(schedule) > 0:
             elapsed = dt.datetime.now() - init_time
@@ -807,7 +808,10 @@ def simMaster():
             #print('')
             print(event.get_eTime(), event.get_eType(), event.get_eObj().get_ID(), 'elapsed:', elapsed)
             schedule = masterEventHandler(event, schedule)
-            
+            if event.get_eTime().hour in [7,8,16,17,18]:
+                dynamic_net = ATXcongest
+            else:
+                dynamic_net = ATXnet
 
             pv, ttl, idle = stateReport(True, schedule, idle, event)
             if pv / len(PUDOs) > 2:

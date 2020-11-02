@@ -7,44 +7,50 @@ Created on Tue Oct 20 21:46:08 2020
 from matplotlib import pyplot as plt
 import numpy
 import networkx as nx
-congestionRatios = {}
-outD = {}
-def createRatioDicts():
+from pudo_work import bruteCoord
+
+def createRatioDicts(urban_core_nodes):
+    congestionRatios = {}
+    outD = {}
+    outD2 = {}
+    outD3 = {}
     for node in nodeDict.keys():
-        adjnodes = []
-        congestionRatios[node] = []
-        neighbors = list(ATXnet.neighbors(node))
-        for n in neighbors:
-            adjnodes += list(ATXnet.neighbors(n))
-        adjUnique = list(set(adjnodes))
-        while node in adjUnique:
-            adjUnique.remove(node)
-        for n in neighbors:
-            while n in adjUnique:
-                adjUnique.remove(n)
-    #    for e in edgeDict.keys():
-    #        if e[0] == node:
-    #            adjnodes.append(e[1])
-    #        if e[1] == node:
-    #            adjnodes.append(e[0])
-        for oNode in adjUnique:
-            ratio = 1
-            try:
-                dur = nx.astar_path_length(ATXnet,oNode,node,weight='weight')
-                cdur = nx.astar_path_length(ATXcongest,oNode,node,weight='weight')
-                ratio = cdur / dur
-            except:
-                print('no route possible')
-    #    for an in adjnodes:
-    #        for e in edgeDict.keys():
-    #            if e[0] == an or e[1] == an:
-    #                edge = edgeDict[e]
-    #                if edge.get_duration() == 0 or edge.get_congested_duration() == 0:
-    #                    pass
-    #                else:
-    #                    #print('real val')
-            congestionRatios[node].append(ratio)
-    congestionRatios.pop('6781')
+        if [int(node), nodeDict[node].get_lat(), nodeDict[node].get_long()] in urban_core_nodes:
+            print(node)
+            adjnodes = []
+            congestionRatios[node] = []
+            neighbors = list(ATXnet.neighbors(node))
+            for n in neighbors:
+                adjnodes += list(ATXnet.neighbors(n))
+            adjUnique = list(set(adjnodes))
+            while node in adjUnique:
+                adjUnique.remove(node)
+            for n in neighbors:
+                while n in adjUnique:
+                    adjUnique.remove(n)
+        #    for e in edgeDict.keys():
+        #        if e[0] == node:
+        #            adjnodes.append(e[1])
+        #        if e[1] == node:
+        #            adjnodes.append(e[0])
+            for oNode in adjUnique:
+                ratio = 1
+                try:
+                    dur = nx.astar_path_length(ATXnet,oNode,node,weight='weight')
+                    cdur = nx.astar_path_length(ATXcongest,oNode,node,weight='weight')
+                    ratio = cdur / dur
+                except:
+                    print('no route possible')
+        #    for an in adjnodes:
+        #        for e in edgeDict.keys():
+        #            if e[0] == an or e[1] == an:
+        #                edge = edgeDict[e]
+        #                if edge.get_duration() == 0 or edge.get_congested_duration() == 0:
+        #                    pass
+        #                else:
+        #                    #print('real val')
+                congestionRatios[node].append(ratio)
+    #congestionRatios.pop('6781')
     for node in congestionRatios.keys():
         outD[node] = numpy.std(congestionRatios[node])
         outD2[node] = sum(congestionRatios[node])/len(congestionRatios[node])
@@ -137,11 +143,11 @@ def reducedNodes():
     return outL, edgect, tripct
 
 def build_hybrid_pudos(current_pudofile, current_clusterfile):
-    PUDOList = pd.read_csv('PUDOS\\'+current_+pudofile+'.csv'\
-                       ,dtype = {'id':np.int\
-                                 ,'lat':np.float64\
-                                 ,'long':np.float64})\
-                       .values.tolist()
+#    PUDOList = pd.read_csv('PUDOS\\'+current_+pudofile+'.csv'\
+#                       ,dtype = {'id':np.int\
+#                                 ,'lat':np.float64\
+#                                 ,'long':np.float64})\
+#                       .values.tolist()
     clusterList = pd.read_csv('CLUSTERS\\'+current_clusterfile+'.csv'\
                           ,dtype = {'id':np.int\
                                     ,'lat':np.float64\
@@ -149,5 +155,40 @@ def build_hybrid_pudos(current_pudofile, current_clusterfile):
                                     ,'cluster':np.int})\
                         .values.tolist()
     urban_core = pd.read_csv('urban_core_nodes.csv').values.tolist()
+    core_clusters = []
+    newPUDOs = []
+    for cL in clusterList:
+        if cL in urban_core:
+            core_cluster.append(cL[3])
+    for cL in clusterList:
+        if cL[3] not in core_cluster:
+            non_core_node = clusterList.pop(clusterList.index(cL))
+            newPUDOs.append(non_core_node)
+
+def define_PUDOs(newPUDOs, clusterList, ratioDict):
+    centroidPUDOs = newPUDOs.copy()
+    clusterPUDOs = newPUDOs.copy()
+    clusterNodes = {}
+    centDict = {}
+    clusDict = {}
+    for cl in clusterList:
+        clusterNodes[cl[3]] = []
+    for cl in clusterList:
+        clusterNodes[cl[3]].append(nodeDict[str(cl[0])])
+    for nl in clusterNodes.values():
+        
+        ######these lambda functions still dont work
+        max_r_node = max(list(map(lambda nl: ratioDict[nl.get_ID()], nl)))
+        sum_lat = sum(list(map(lambda nl: nl.get_lat()], nl)))
+        sum_long = sum(list(map(lambda nl: nl.get_long()], nl)))
+        centroid_lat = sum_lat / len(nl)
+        centroid_long = sum_long / len(nl)
+        centroid_node = bruteCoord((centroid_lat, centroid_long), nodeDict)
+        centroidPUDOs.append([centroid_node.get_ID(), centroid_node.get_lat(), centroid_node.get_long()])
+        clusterPUDOs.append([max_r_node.get_ID(), max_r_node.get_lat(), max_r_node.get_long()])
+    return centroidPUDOs, clusterPUDOs
+
     
+    
+            
     
