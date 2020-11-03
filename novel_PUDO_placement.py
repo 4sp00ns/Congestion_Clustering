@@ -157,18 +157,22 @@ def build_hybrid_pudos(current_clusterfile):
     urban_core = pd.read_csv('urban_core_nodes.csv').values.tolist()
     core_cluster = []
     newPUDOs = []
+    trunc_cl = []
     for cL in clusterList:
-        if cL in urban_core:
+        if cL[:3] in urban_core:
+            #print('dingdingding')
             core_cluster.append(cL[3])
+            core_cluster = list(set(core_cluster))
+            trunc_cl.append(cL)
     for cL in clusterList:
         if cL[3] not in core_cluster:
-            non_core_node = clusterList.pop(clusterList.index(cL))
-            newPUDOs.append(non_core_node[:3])
-    centroidPUDOs, congestPUDOs = define_PUDOs(newPUDOs, clusterList, rangeD)
+            newPUDOs.append(cL[:3])
+    print(len(newPUDOs))
+    centroidPUDOs, congestPUDOs = define_PUDOs(newPUDOs, trunc_cl, rangeD)
     pd.DataFrame(centroidPUDOs, columns=['id','lat','long'])\
-            .to_csv('PUDOS\\PUDOs_UCentroid_'+current_clusterfile[:11]+'.csv')
+            .to_csv('PUDOS\\PUDOs_UCentroid_'+current_clusterfile[12:]+'.csv', index=False)
     pd.DataFrame(congestPUDOs, columns=['id','lat','long'])\
-            .to_csv('PUDOS\\PUDOs_UCongest_'+current_clusterfile[:11]+'.csv')
+            .to_csv('PUDOS\\PUDOs_UCongest_'+current_clusterfile[12:]+'.csv', index=False)
     return centroidPUDOs, congestPUDOs
 
 def define_PUDOs(newPUDOs, clusterList, ratioDict):
@@ -201,7 +205,22 @@ def define_PUDOs(newPUDOs, clusterList, ratioDict):
         congestPUDOs.append([max_r_node.get_ID(), max_r_node.get_lat(), max_r_node.get_long()])
     return centroidPUDOs, congestPUDOs
 
-    
-    
-            
+def test_async():
+    clusterList1 = pd.read_csv('CLUSTERS\\'+'clusterDict_asynccongest1000'+'.csv'\
+                      ,dtype = {'id':np.str\
+                                ,'lat':np.float64\
+                                ,'long':np.float64\
+                                ,'cluster':np.str})\
+                    .values.tolist()
+    clusterList2 = pd.read_csv('CLUSTERS\\'+'clusterDict_asynccongest2000'+'.csv'\
+                      ,dtype = {'id':np.str\
+                                ,'lat':np.float64\
+                                ,'long':np.float64\
+                                ,'cluster':np.str})\
+                    .values.tolist()
+    cl1 = []
+    cl2 = []
+    #for uc in urban_core:
+     #   if 
+
     

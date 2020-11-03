@@ -255,16 +255,24 @@ def tripweight_nodes(trips):
 
 def createNetwork():
     print('building network')
-    global ATXnet, ATXcongest
+    global ATXnet, ATXcongest, ATXnet_undir, ATXcongest_undir
     load_gtraffic(edgeDict)
     ATXnet = nx.DiGraph()
+    ATXnet_undir = nx.Graph()
     ATXcongest = nx.DiGraph()
+    ATXcongest_undir = nx.Graph()
     ATXnet.add_nodes_from(nodeDict.keys())
     ATXcongest.add_nodes_from(nodeDict.keys())
     for e in edgeDict.keys():
         if e[0] != e[1]:
             ATXnet.add_edge(e[0],e[1],weight=float(edgeDict[e].get_duration()))
+            ATXnet_undir.add_edge(e[0],e[1],weight=float(edgeDict[e].get_duration()))
+            try:
+                congested_dur = max([edgeDict[e].get_congested_duration(), edgeDict[e[::-1]].get_congested_duration()])
+            except:
+                congested_dur = edgeDict[e].get_congested_duration()
             ATXcongest.add_edge(e[0],e[1],weight=float(edgeDict[e].get_congested_duration()))
+            ATXcongest_undir.add_edge(e[0],e[1],weight=float(congested_dur))
     #return ATXnet
 def initVehicles(PUDOs, numvehicles):
     plist = list(PUDOs.values())
