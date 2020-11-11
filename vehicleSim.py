@@ -170,9 +170,9 @@ class Event(object):
 #############################################
 ##########INITIALIZATION FUNCTIONS###########
 #############################################
-def getConfig():
+def getConfig(configfile):
     cwd = os.getcwd()
-    with open(cwd+r'\config.json') as f:
+    with open(configfile+'.json') as f:
         config = json.load(f)            
     return config        
 def readData(clusterid, pudoid):
@@ -234,6 +234,8 @@ def createDataStructures(PUDOList, schedule):
     PUDOs = buildPUDOs(PUDOList)
     for pu in PUDOs.values():
         clusterPUDOs[pu.get_cluster()].append(pu)
+        if len(clusterPUDOs[pu.get_cluster()]) > 7200:
+            print('DEBUG WHAT THE FUCK',pu.get_cluster())
     schedule = createSchedule(schedule, config["numtrips"])
     enrouteDict = {}
     return PUDOs, schedule
@@ -255,7 +257,7 @@ def tripweight_nodes(trips):
 
 def createNetwork():
     print('building network')
-    global ATXnet, ATXcongest, ATXnet_undir, ATXcongest_undir
+    global ATXnet, ATXcongest, ATXnet_undir, ATXcongest_undir, dynamic_net
     load_gtraffic(edgeDict)
     ATXnet = nx.DiGraph()
     ATXnet_undir = nx.Graph()
@@ -273,6 +275,7 @@ def createNetwork():
                 congested_dur = edgeDict[e].get_congested_duration()
             ATXcongest.add_edge(e[0],e[1],weight=float(edgeDict[e].get_congested_duration()))
             ATXcongest_undir.add_edge(e[0],e[1],weight=float(congested_dur))
+    dynamic_net = ATXnet
     #return ATXnet
 def initVehicles(PUDOs, numvehicles):
     plist = list(PUDOs.values())
@@ -356,6 +359,8 @@ def getClusterAdjacencies():
     for a in adjDict.keys():
         if a not in adjDict[a]:
             adjDict[a].append(a)
+    for a in adjDict.keys():
+        adjDict[a] = list(set(adjDict[a]))
     return adjDict
 
 
@@ -410,29 +415,47 @@ def assignVehicle(ride, schedule): #,enrouteDict):
             schedule = findNearestVehicle(ride, schedule)
     return schedule
 def findNearestVehicle(ride, schedule):
-    nearbyPUDOs = [PUDOs[ride.get_origin()]]#clusterPUDOs[nodeDict[ride.get_origin()].get_cluster()]
+    nearbyPUDOs = list(clusterPUDOs[nodeDict[ride.get_origin()].get_cluster()]) #[PUDOs[ride.get_oPUDO().get_ID()]]#
         
     currlen = len(nearbyPUDOs)
-    print('cluster',nodeDict[ride.get_origin()].get_cluster(),'len nearbypudos',len(nearbyPUDOs))
+    #print('cluster',nodeDict[ride.get_origin()].get_cluster(),'len nearbypudos',len(nearbyPUDOs))
     while max(list(map(lambda nearbyPUDOs: nearbyPUDOs.get_capacity(), nearbyPUDOs))) == 0:
          print('DEBUG no vehicles at adj level',currlen,'@',ride.get_origin(),'extending search')
-         
-         newNodes = []
-         p_to_add = []
-         for newp in nearbyPUDOs:
-             
-             newNodes += list(dynamic_net[newp.get_ID()])
-             #print('newp and newnodes',newp.get_ID(), len(newNodes))
-             for n in newNodes:
-                 if n in PUDOs.keys()\
-                     and PUDOs[n] not in nearbyPUDOs\
-                     and PUDOs[n] not in p_to_add:
-                     p_to_add.append(PUDOs[n])
-         print('adding these nodes to nearbyPUDOs', len(p_to_add))
-         nearbyPUDOs += p_to_add
+         pta = []
+         for nbyp in nearbyPUDOs:
+             clus = nbyp.get_cluster()
+             newClus = list(adjDict[clus])
+             for nc in newClus:
+                 newPUDOs = list(clusterPUDOs[nc])
+                 for npp in newPUDOs:
+                     if npp not in nearbyPUDOs:
+                         pta.append(npp)
+         nearbyPUDOs += pta
+                         
+#         newNodes = []
+#         p_to_add = []
+#         for newp in nearbyPUDOs:
+#             newNodes += list(dynamic_net[newp.get_ID()])
+#             #print('newp and newnodes',newp.get_ID(), len(newNodes))
+#             for n in newNodes:
+#                 if n in PUDOs.keys()\
+#                     and PUDOs[n] not in nearbyPUDOs\
+#                     and PUDOs[n] not in p_to_add:
+#                     p_to_add.append(PUDOs[n])
+#         
+#         if len(p_to_add) == 0:
+#             print('no adjacent node PUDOs, moving to adjcluster method')
+#             adj = adjDict[nodeDict[ride.get_origin()].get_cluster()]
+#             for a in adj:
+#                 pudos_to_add = clusterPUDOs[a]
+#                 for pta in pudos_to_add:
+#                     if pta not in nearbyPUDOs and pta not in p_to_add:
+#                         p_to_add.append(pta)
+#         print('adding these nodes to nearbyPUDOs', len(p_to_add))
+#         nearbyPUDOs += p_to_add
          currlen = len(nearbyPUDOs)          
          if currlen > 1000:
-             print('no vehicle in nearest 1000 nodes, dropping ride')
+             print('no vehicle in nearest 1000 PUDOs, dropping ride')
              ride.dropped = True
              return schedule
 #        if currlen > len(PUDOs)/2:
@@ -450,9 +473,13 @@ def findNearestVehicle(ride, schedule):
     #if no compatible rideshares are found we pull the PUDOs of the adjacent clusters
     
     #walk through adjacent PUDOs (in order of distance) and find nearest PUDO with capacity
-    for np in nearbyPUDOs:
-        if np.get_capacity() > 0:
-            chosenPUDO = np
+    mindist = 999999
+    for npp in nearbyPUDOs:
+        if npp.get_capacity() > 0:
+            dist = shortestPath(ride.get_oPUDO().get_ID(), npp.get_ID())[1]
+            if dist < mindist:
+                mindist = dist
+                chosenPUDO = npp
             break
 #    #strip a vehicle from that PUDO and assign it, otherwise expand search
 #    try:
@@ -598,7 +625,7 @@ def rideshareLogic(ride, schedule):
 #        if p.get_capacity > config["PUDOcap"]
 def reallocateVehicles(schedule, currTime, relocnum):
     #print('reallocating vehicles')
-    global vCount
+    global vCount2
     vCount = {}
     for c in adjDict.keys():
         vCount[c] = []
@@ -623,7 +650,7 @@ def reallocateVehicles(schedule, currTime, relocnum):
                         , len(vCount[it])-1\
                         , sum(vCount[it][:-1])]
         vCount2[it].append(vCount2[it][1]/vCount2[it][2])
-        vCount2[it].append(vCount2[it][3]/(vCount2[it][2]-1))
+        vCount2[it].append(vCount2[it][3]/(vCount2[it][2])) #removed a -1 in denominator
     needs_vehicles = []
     for macroCluster in vCount2.keys():
         if vCount2[macroCluster][4] < 1.5:
@@ -637,7 +664,7 @@ def reallocateVehicles(schedule, currTime, relocnum):
         print('cluster with most available vehicles is', overCapCluster)
         for pp in PUDOs.values():
             if pp.get_cluster() in adjDict[overCapCluster] and pp.get_capacity() >= 1:
-                #print('found opudo', pp.get_ID())
+                print('found opudo', pp.get_ID())
                 #print(pp.get_cluster(), 'in', adjDict[overCapCluster])
                 oPUDO = pp.get_ID()
                 break
@@ -654,7 +681,9 @@ def reallocateVehicles(schedule, currTime, relocnum):
             PUDOs[oPUDO].capacity -= 1
             ride = Ride('reloc'+str(relocnum), currTime, oPUDO, dPUDO, PUDOs[oPUDO], PUDOs[dPUDO])
             (ride.route, traveltime) = shortestPath(oPUDO, dPUDO)
-            #print('DEBUG realloc traveltime',traveltime, oPUDO, dPUDO)
+            print('DEBUG realloc traveltime',traveltime, oPUDO, dPUDO)
+            if traveltime == 0:
+                print(WTF)
             ride.arrival_time = currTime + dt.timedelta(seconds = traveltime)
             #print('DEBUG for redundant schedule items', (ride.get_arrival_time(),'Reallocation',ride.get_ID()) in list(schedule.keys()))
             #print('DEBUG', (ride.get_arrival_time(),'Reallocation',ride.get_ID()))
@@ -666,7 +695,7 @@ def reallocateVehicles(schedule, currTime, relocnum):
                 vCount2[clus][3] =- 1
                 #recalc vehicles / pudo including excluding the enroute vehicles
                 vCount2[clus][4] = vCount2[clus][1]/vCount2[clus][2]
-                vCount2[clus][5] = vCount2[clus][3]/(vCount2[clus][2]-1)
+                vCount2[clus][5] = vCount2[clus][3]/(vCount2[clus][2]) #removed a -1 in denominator
     #print('no vehicles need to be reallocated')
     return schedule, relocnum
 def masterEventHandler(event, schedule):
@@ -790,22 +819,21 @@ def getNextEvent(schedule):
     event = schedule.pop(time)
     return event, schedule#, delta_t
 
-def simMaster():
+def simMaster(configfile):
     idle = []
     global reporting, config, dynamic_net
     reporting = []
     tripct = 0
     #global config
     relocnum = 0
-    config = getConfig()
-    runid = 'test_increase_relocate'
+    config = getConfig(configfile)
+    runid = 'vehiclesensitivities'
     #runid, ncluster = config["runids"][3], config["clustercounts"][6]
-    clusterid, pudoid = 'clusterDict_kmean_nodeweight2000','network_PUDOsnoPUDO'
+    clusterid, pudoid = config["clusterfile"], config["pudofile"]
     PUDOList = readData(clusterid, pudoid)
     schedule = {}
     PUDOs, schedule = createDataStructures(PUDOList, schedule)
     init_time = dt.datetime.now()
-    dynamic_net = ATXnet
     try:
         while len(schedule) > 0:
             elapsed = dt.datetime.now() - init_time
@@ -816,7 +844,7 @@ def simMaster():
             #print('')
             print(event.get_eTime(), event.get_eType(), event.get_eObj().get_ID(), 'elapsed:', elapsed)
             schedule = masterEventHandler(event, schedule)
-            if event.get_eTime().hour in [7,8,16,17,18]:
+            if event.get_eTime().hour in [7,8,9,16,17,18]:
                 dynamic_net = ATXcongest
             else:
                 dynamic_net = ATXnet

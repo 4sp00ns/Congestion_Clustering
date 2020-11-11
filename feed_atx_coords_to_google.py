@@ -47,7 +47,8 @@ donelist = []
 outlist = pd.read_csv('googlemaps_data_full.csv').values.tolist()
 for o in outlist:
     donelist.append((o[0],o[1]))
-for edge in edgeDict.keys():
+#for edge in edgeDict.keys():
+    #broekn to prevent running
     ii+=1
     if (edge[0], edge[1]) in donelist:
         print('skipping edge',edge[0], edge[1])

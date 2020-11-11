@@ -99,8 +99,9 @@ def trip_weighted_node_coord(tripList):
 def load_gtraffic(edgeDict):
     traffic = pd.read_csv('googlemaps_data_full.csv').values.tolist()
     for t in traffic:
-        edgeDict[(str(t[1]),str(t[0]))].duration = t[5]
-        edgeDict[(str(t[1]),str(t[0]))].congested_duration = t[6]
+        edge = edgeDict[(str(t[1]),str(t[0]))]
+        edge.duration = edge.get_fft()*60#(2.37*2*t[4]/(1+t[5]))/(edge.get_length()/5280)
+        edge.congested_duration =  edge.get_duration() * (1+t[6])/(1+t[5])#(2.37*2*t[4]/(1+t[6]))/(edge.get_length()/5280)
 
 def createClusterDict(clusterarr, kmean_input, nodes,outstr,nclusters):
     print('assigning clusters to nodes')
