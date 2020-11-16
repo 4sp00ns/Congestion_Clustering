@@ -653,7 +653,7 @@ def reallocateVehicles(schedule, currTime, relocnum):
         vCount2[it].append(vCount2[it][3]/(vCount2[it][2])) #removed a -1 in denominator
     needs_vehicles = []
     for macroCluster in vCount2.keys():
-        if vCount2[macroCluster][4] < 1.5:
+        if vCount2[macroCluster][4] < .25*(config["numvehicles"]/len(PUDOs)):
             ##shifted to 1.5 to check runtime
             needs_vehicles.append(macroCluster)
             ###this cluster needs vehicles###
@@ -670,7 +670,7 @@ def reallocateVehicles(schedule, currTime, relocnum):
                 break
         #print(adjDict[macroCluster])
         for p in PUDOs.values():
-            if p.get_cluster() in adjDict[macroCluster] and p.get_capacity() <= 1:
+            if p.get_cluster() in adjDict[macroCluster] and p.get_capacity() < 1:
                 #print('found dpudo',p.get_ID())
                 #print(p.get_cluster(), 'in', adjDict[macroCluster])
                 dPUDO = p.get_ID()
@@ -678,7 +678,7 @@ def reallocateVehicles(schedule, currTime, relocnum):
         #print('moving vehicle from:',oPUDO,' to ', dPUDO)
         if oPUDO != 'skip':
             relocnum += 1        
-            PUDOs[oPUDO].capacity -= 1
+            PUDOs[oPUDO].capacity -= 1 
             ride = Ride('reloc'+str(relocnum), currTime, oPUDO, dPUDO, PUDOs[oPUDO], PUDOs[dPUDO])
             (ride.route, traveltime) = shortestPath(oPUDO, dPUDO)
             print('DEBUG realloc traveltime',traveltime, oPUDO, dPUDO)
@@ -850,8 +850,8 @@ def simMaster(configfile):
                 dynamic_net = ATXnet
 
             pv, ttl, idle = stateReport(True, schedule, idle, event)
-            if pv / len(PUDOs) > 2:
-                #only reallocate if the number of idle vehicles is twice the number of PUDOs
+            if pv / config["numvehicles"] > .25:
+                #only reallocate if there are idle vehicles
                 schedule, relocnum = reallocateVehicles(schedule, event.get_eTime(),relocnum)
             if ttl < config["numvehicles"]-1:
                 print('missing vehicles, killing sim')

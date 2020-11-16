@@ -27,10 +27,10 @@ from networkx import community as c
 #    congest_list.append(edgeDict[e].get_congested_duration())
 #igraphATX = igraph.Graph(n=7466, edges=elist) #, edge_attrs={'weight':fft_list}) 
 
-n_clusters = 1000
+n_clusters = 1750
 #smallest_clique = 2
-asyn = c.asyn_fluidc(ATXnet_undir, 1000)
-asyn_congest = c.asyn_fluidc(ATXcongest_undir,1000)
+asyn = c.asyn_fluidc(ATXnet_undir, 1750)
+asyn_congest = c.asyn_fluidc(ATXcongest_undir,1750)
 ##kclq = list(c.k_clique_communities(ATXnet,3))
 ##kclq_congest = list(c.k_clique_communities(ATXcongest, 3))
 #
