@@ -29,6 +29,7 @@ class Ride(object):
         self.arrival_time = 0
         self.route = []
         self.dropped = False
+        self.shared_VMT = []
     def get_ID(self):
         return self.ID
     def get_hail_time(self):
@@ -47,6 +48,8 @@ class Ride(object):
         return self.route
     def get_dropped(self):
         return self.dropped
+    def get_shared_VMT(self):
+        return self.shared_VMT
     
 class PUDO(object):
     def __init__(self, node, cluster, capacity):
@@ -172,7 +175,7 @@ class Event(object):
 #############################################
 def getConfig(configfile):
     cwd = os.getcwd()
-    with open(configfile+'.json') as f:
+    with open('CONFIGS\\'+configfile+'.json') as f:
         config = json.load(f)            
     return config        
 def readData(clusterid, pudoid):
@@ -408,8 +411,11 @@ def assignVehicle(ride, schedule): #,enrouteDict):
         schedule[(ride.get_arrival_time(),'Arrival',ride.get_ID())] = Event(ride.get_arrival_time(), 'Arrival',ride)
     else:
         #if not, we check ongoing rides for compatible rideshares
-        print('no vehicle available, checking rideshare')
-        sharing, schedule = rideshareLogic(ride, schedule)
+        if config["ridesharing"] == "yes":
+            print('no vehicle available, checking rideshare')
+            sharing, schedule = rideshareLogic(ride, schedule)
+        elif config["ridesharing"] == "no":
+            sharing = False
         if sharing == False:
             print('no rideshare, pulling from adjacent PUDOs')
             schedule = findNearestVehicle(ride, schedule)
@@ -454,7 +460,7 @@ def findNearestVehicle(ride, schedule):
 #         print('adding these nodes to nearbyPUDOs', len(p_to_add))
 #         nearbyPUDOs += p_to_add
          currlen = len(nearbyPUDOs)          
-         if currlen > 1000:
+         if currlen > config["drop"]:
              print('no vehicle in nearest 1000 PUDOs, dropping ride')
              ride.dropped = True
              return schedule
@@ -533,7 +539,7 @@ def rideshareLogic(ride, schedule):
             ###identify the approximate location of the vehicle###
             ###by stepping through the route and assessing the travel time for each step###
             ###and comparing aggregate travel time to the elapsed time since the ride request###
-            timesum += dt.timedelta(seconds=edgeDict[(route[pos],route[pos+1])].get_fft())
+            timesum += dt.timedelta(seconds=edgeDict[(route[pos],route[pos+1])].get_duration())
             if timesum < elapsed:
                 ###the vehicle has already passed this node###
                 ###shift the vehicles assumed location forward 1 node on its route###
@@ -571,6 +577,7 @@ def rideshareLogic(ride, schedule):
                     #new ride destination to original route destination
                     rideExt = shortestPath(ride.get_dPUDO().get_ID(), route[-1:][0])
                     ride.arrival_time = ride.get_hail_time()+dt.timedelta(seconds = rideDiversion[1]+newRoute[1])
+                    ride.shared_VMT = newRoute[0]
                     ###enrouteDict[rkey].arrival_time = ride.get_arrival_time() + dt.timedelta(seconds = rideExt[1])
                     ####enrouteDict[rkey].route = route[:pos] + rideDiversion[0][1:] + newRoute[0][1:] +rideExt[1:]
                     #pop current route from enrouteDict and recreate with proper keying
@@ -582,6 +589,7 @@ def rideshareLogic(ride, schedule):
                     ###enrouteDict[(rt_arrival_time), enroute.get_ID()].route = route[:route.index(vehicle_loc)+1] + rideDiversion[0][1:] + newRoute[0][1:] +rideExt[0][1:]
                     enroute.arrival_time = rt_arrival_time
                     enroute.route = route[:route.index(vehicle_loc)+1] + rideDiversion[0][1:] + newRoute[0][1:] +rideExt[0][1:]
+                    enroute.shared_VMT = newRoute[0]
                     enrouteDict.pop(rkey)
                     #create new schedule objects for rideshare and arrival
                     firstArrival = ride.get_hail_time()+dt.timedelta(seconds = rideDiversion[1]+newRoute[1])
@@ -608,11 +616,13 @@ def rideshareLogic(ride, schedule):
                     ###enrouteDict[(rt_arrival_time), enroute.get_ID()].arrival_time = rt_arrival_time
                     ###enrouteDict[(rt_arrival_time), enroute.get_ID()].route = route[:route.index(vehicle_loc)+1] + rideDiversion[0][1:] + newRoute[0][1:]
                     enroute.arrival_time = rt_arrival_time
+                    enroute.shared_VMT = newRoute[0]
                     enroute.route = route[:route.index(vehicle_loc)+1] + rideDiversion[0][1:] + newRoute[0][1:]
                     enrouteDict.pop(rkey)
                     #create new schedule objects for rideshare and arrival
                     ride.arrival_time = rt_arrival_time + dt.timedelta(seconds = rideExt[1])
                     ride.route = newRoute[0] + rideExt[0][1:]
+                    ride.shared_VMT = newRoute[0]
                     firstArrival = ride.get_hail_time()+dt.timedelta(seconds = rideDiversion[1]+newRoute[1])
                     finalArrival = firstArrival + dt.timedelta(seconds = rideExt[1])
                     schedule[(firstArrival,'Rideshare',enroute.get_ID())] = Event(firstArrival,'Rideshare',enroute)
@@ -653,7 +663,7 @@ def reallocateVehicles(schedule, currTime, relocnum):
         vCount2[it].append(vCount2[it][3]/(vCount2[it][2])) #removed a -1 in denominator
     needs_vehicles = []
     for macroCluster in vCount2.keys():
-        if vCount2[macroCluster][4] < .25*(config["numvehicles"]/len(PUDOs)):
+        if vCount2[macroCluster][4] < .20*(config["numvehicles"]/len(PUDOs)):
             ##shifted to 1.5 to check runtime
             needs_vehicles.append(macroCluster)
             ###this cluster needs vehicles###
@@ -740,7 +750,7 @@ def eventReport(event, write, runid, idle):
         out_df = pd.DataFrame(reporting, columns = ['time','type','ID','hail_time'\
                                               ,'arrival_time','vehicle_time','origin'\
                                               ,'destination','oPUDO','dPUDO','route'\
-                                              ,'VMT','origin_walk','dest_walk','total_walk'])
+                                              ,'VMT','shared_VMT','origin_walk','dest_walk','total_walk'])
         out_df.to_csv('REPORTING\\reporting_' + runid + '_v'+str(config["numvehicles"])+ '.csv')
         formatted_df = format_df(out_df)
         formatted_df.to_csv('REPORTING\\aggreport' + runid + '_v'+str(config["numvehicles"])+ '.csv')
@@ -762,9 +772,13 @@ def eventReport(event, write, runid, idle):
         walkD += edgeDict[walk_d_route[wd], walk_d_route[wd+1]].get_length()
     ttl_walk = walkO + walkD
     VMT = 0
+    sVMT = 0
     route = obj.get_route()
     for n in range(len(route)-1):
         VMT += edgeDict[route[n],route[n+1]].get_length()
+    if obj.get_shared_VMT != []:
+        for n in range(len(obj.get_shared_VMT())-1):
+            sVMT += edgeDict[route[n],route[n+1]].get_length()        
     out = [event.get_eTime()\
            ,event.get_eType()\
            ,obj.get_ID()\
@@ -777,6 +791,7 @@ def eventReport(event, write, runid, idle):
            ,obj.get_dPUDO().get_ID()\
            ,route\
            ,VMT\
+           ,sVMT
            ,walkO\
            ,walkD\
            ,ttl_walk\
@@ -827,7 +842,9 @@ def simMaster(configfile):
     #global config
     relocnum = 0
     config = getConfig(configfile)
-    runid = 'vehiclesensitivities'
+    runid = config["runid"]
+    print('runid', runid)
+    print('ridesharing?', config["ridesharing"])
     #runid, ncluster = config["runids"][3], config["clustercounts"][6]
     clusterid, pudoid = config["clusterfile"], config["pudofile"]
     PUDOList = readData(clusterid, pudoid)
