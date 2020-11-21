@@ -785,14 +785,16 @@ def eventReport(event, write, runid, idle):
     sVMT = 0
     eVMT = 0
     route = obj.get_route()
+    sroute = obj.get_shared_VMT()
+    eroute = obj.get_empty_VMT()
     for n in range(len(route)-1):
         VMT += edgeDict[route[n],route[n+1]].get_length()
     if obj.get_shared_VMT != []:
         for n in range(len(obj.get_shared_VMT())-1):
-            sVMT += edgeDict[route[n],route[n+1]].get_length() 
+            sVMT += edgeDict[sroute[n],sroute[n+1]].get_length() 
     if obj.get_empty_VMT != []:
         for n in range(len(obj.get_empty_VMT())-1):
-            eVMT += edgeDict[route[n],route[n+1]].get_length()  
+            eVMT += edgeDict[eroute[n],eroute[n+1]].get_length()  
     out = [event.get_eTime()\
            ,event.get_eType()\
            ,obj.get_ID()\
