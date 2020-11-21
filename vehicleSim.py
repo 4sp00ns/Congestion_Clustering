@@ -567,7 +567,7 @@ def rideshareLogic(ride, schedule):
                 #remove existing arrival
                 if 'reloc' in str(enroute.get_ID()):
                     schedule.pop((enroute.get_arrival_time(),'Reallocation',enroute.get_ID()))
-                    enroute.empty_VMT = shortestPath(enroute.get_oPUDO().get_ID(), vehicle_loc)
+                    enroute.empty_VMT = shortestPath(enroute.get_oPUDO().get_ID(), vehicle_loc)[0]
                 else:
                     schedule.pop((enroute.get_arrival_time(),'Arrival',enroute.get_ID()))
                 
@@ -788,13 +788,13 @@ def eventReport(event, write, runid, idle):
     sroute = obj.get_shared_VMT()
     eroute = obj.get_empty_VMT()
     for n in range(len(route)-1):
-        VMT += edgeDict[route[n],route[n+1]].get_length()
+        VMT += edgeDict[(route[n],route[n+1])].get_length()
     if obj.get_shared_VMT != []:
         for n in range(len(obj.get_shared_VMT())-1):
-            sVMT += edgeDict[sroute[n],sroute[n+1]].get_length() 
+            sVMT += edgeDict[(sroute[n],sroute[n+1])].get_length() 
     if obj.get_empty_VMT != []:
         for n in range(len(obj.get_empty_VMT())-1):
-            eVMT += edgeDict[eroute[n],eroute[n+1]].get_length()  
+            eVMT += edgeDict[(eroute[n],eroute[n+1])].get_length()  
     out = [event.get_eTime()\
            ,event.get_eType()\
            ,obj.get_ID()\
