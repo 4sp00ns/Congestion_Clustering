@@ -244,7 +244,7 @@ def empty_VMT_chart(senslist):
         dfj = spark.read.options(header='True').options(inferschema = 'True').csv('reporting_'+str(vc)+'.csv')\
             .filter((col('type') == lit('Arrival'))|(col('type') == lit('Rideshare')))\
             .withColumn('hour', hour(col('hail_time')))\
-            .withColumn('VMTa',col('emprty_VMT')/5280)\
+            .withColumn('VMTa',col('empty_VMT')/5280)\
             .drop('VMT')\
             .select('hour', 'VMTa')\
             .groupBy('hour').agg(F.sum(col('VMTa')).alias('Empty_VMT_'+str(vc)))

@@ -69,7 +69,7 @@ def choosePUDOs(numpudos, ratioDict, typename):
     for num in range(numpudos):
         nodeID = max(ratioDict, key=ratioDict.get)
         ratioDict.pop(nodeID)
-        print(nodeID)
+        #print(nodeID)
         newPUDOs.append([int(nodeID), nodeDict[nodeID].get_lat(), nodeDict[nodeID].get_long()])
     pd.DataFrame(newPUDOs, columns = ['id','lat','long'])\
                         .to_csv('PUDOS\\networkPUDOs_novel_'+typename+str(numpudos)+'.csv'\
@@ -203,7 +203,14 @@ def define_PUDOs(newPUDOs, clusterList, ratioDict):
         sum_long = sum(list(map(lambda nl: nl.get_long(), nl)))
         centroid_lat = sum_lat / len(nl)
         centroid_long = sum_long / len(nl)
-        centroid_node_id = bruteCoord((centroid_lat, centroid_long), nodeDict)
+        reduced_nodes = {}
+#        curclus = nl.get_cluster()
+#        for n in nodeDict.keys():
+#            if nodeDict[n].get_cluster() == curclus:
+#                reduced_nodes[n] = nodeDict[n]
+        for nodelet in nl:
+            reduced_nodes[nodelet.get_ID()] = nodelet 
+        centroid_node_id = bruteCoord((centroid_lat, centroid_long), reduced_nodes)
         centroid_node = nodeDict[centroid_node_id]
         centroidPUDOs.append([centroid_node.get_ID(), centroid_node.get_lat(), centroid_node.get_long()])
         congestPUDOs.append([max_r_node.get_ID(), max_r_node.get_lat(), max_r_node.get_long()])
