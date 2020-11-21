@@ -219,6 +219,46 @@ def VMT_chart(senslist):
     plt.xlabel('hour of the day')
     return df_p
 
+def empty_VMT_chart(senslist):
+#    minutelist = []
+#    for m in range(0,1440):
+#        minutelist.append(m)
+#    df = spark.createDataFrame(minutelist, IntegerType())
+#    df = df.withColumnRenamed('value','m')
+    
+    hourlist = []
+    for h in range(0,24):
+        hourlist.append(h)
+    df = spark.createDataFrame(hourlist, IntegerType())
+    df = df.withColumnRenamed('value','h')
+#    df = spark.read.options(header='True').options(inferschema = 'True').csv('reporting_vehiclesensitivities_v7500.csv')\
+#        .filter(col('type') == lit('Dropped'))\
+#        .withColumn('minute', minute(col('hail_time'))+hour(col('hail_time'))*60)\
+#        .select('minute')\
+#        .groupBy('minute').agg(count(col('minute')).alias('dropped_vehicles_7500'))\
+#        .orderBy('minute')\
+#        .withColumnRenamed('minute','m')
+    if senslist == '':
+        senslist = ['v5000','v6000','v7500','v10000','v12500','v15000']
+    for vc in senslist:
+        dfj = spark.read.options(header='True').options(inferschema = 'True').csv('reporting_'+str(vc)+'.csv')\
+            .filter((col('type') == lit('Arrival'))|(col('type') == lit('Rideshare')))\
+            .withColumn('hour', hour(col('hail_time')))\
+            .withColumn('VMTa',col('emprty_VMT')/5280)\
+            .drop('VMT')\
+            .select('hour', 'VMTa')\
+            .groupBy('hour').agg(F.sum(col('VMTa')).alias('Empty_VMT_'+str(vc)))
+        df = df.join(dfj\
+                     ,dfj.hour == df.h\
+                     ,how = 'outer')\
+                     .drop('hour')
+    df = df.orderBy('h').drop('h')
+    df_p = df.toPandas()
+    df_p.plot()
+    plt.ylabel('Total Empty VMT')
+    plt.xlabel('hour of the day')
+    return df_p
+
 def total_VMT_chart(senslist):
 #    minutelist = []
 #    for m in range(0,1440):

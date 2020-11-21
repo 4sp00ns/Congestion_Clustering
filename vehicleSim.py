@@ -30,6 +30,7 @@ class Ride(object):
         self.route = []
         self.dropped = False
         self.shared_VMT = []
+        self.empty_VMT = []
     def get_ID(self):
         return self.ID
     def get_hail_time(self):
@@ -50,6 +51,8 @@ class Ride(object):
         return self.dropped
     def get_shared_VMT(self):
         return self.shared_VMT
+    def get_empty_VMT(self):
+        return self.empty_VMT
     
 class PUDO(object):
     def __init__(self, node, cluster, capacity):
@@ -460,8 +463,8 @@ def findNearestVehicle(ride, schedule):
 #         print('adding these nodes to nearbyPUDOs', len(p_to_add))
 #         nearbyPUDOs += p_to_add
          currlen = len(nearbyPUDOs)          
-         if currlen > config["drop"]:
-             print('no vehicle in nearest 1000 PUDOs, dropping ride')
+         if currlen > 2000:
+             #print('no vehicle in nearest 2000 PUDOs, dropping ride')
              ride.dropped = True
              return schedule
 #        if currlen > len(PUDOs)/2:
@@ -511,6 +514,7 @@ def findNearestVehicle(ride, schedule):
     rideExt = shortestPath(chosenPUDO.get_ID(), ride.get_oPUDO().get_ID())
     ###[:-1]prevents duplicate node at the intersection
     ride.route = rideExt[0][:-1] + ride.get_route()
+    ride.empty_VMT = rideExt[0]
     ride.arrival_time = ride.get_arrival_time() + dt.timedelta(seconds = rideExt[1])
     #add the extended route to enroute trips and add the arrival to the schedule
     enrouteDict[(ride.get_hail_time(), ride.get_ID())] = ride
@@ -563,6 +567,7 @@ def rideshareLogic(ride, schedule):
                 #remove existing arrival
                 if 'reloc' in str(enroute.get_ID()):
                     schedule.pop((enroute.get_arrival_time(),'Reallocation',enroute.get_ID()))
+                    enroute.empty_VMT = shortestPath(enroute.get_oPUDO().get_ID(), vehicle_loc)
                 else:
                     schedule.pop((enroute.get_arrival_time(),'Arrival',enroute.get_ID()))
                 
@@ -695,6 +700,7 @@ def reallocateVehicles(schedule, currTime, relocnum):
             if traveltime == 0:
                 print(WTF)
             ride.arrival_time = currTime + dt.timedelta(seconds = traveltime)
+            ride.empty_VMT = ride.route
             #print('DEBUG for redundant schedule items', (ride.get_arrival_time(),'Reallocation',ride.get_ID()) in list(schedule.keys()))
             #print('DEBUG', (ride.get_arrival_time(),'Reallocation',ride.get_ID()))
             schedule[(ride.get_arrival_time(),'Reallocation',ride.get_ID())] = Event(ride.get_arrival_time(), 'Reallocation',ride)
@@ -754,7 +760,7 @@ def eventReport(event, write, runid, idle):
         out_df = pd.DataFrame(reporting, columns = ['time','type','ID','hail_time'\
                                               ,'arrival_time','vehicle_time','origin'\
                                               ,'destination','oPUDO','dPUDO','route'\
-                                              ,'VMT','shared_VMT','origin_walk','dest_walk','total_walk'])
+                                              ,'VMT','shared_VMT','empty_VMT','origin_walk','dest_walk','total_walk'])
         out_df.to_csv('REPORTING\\reporting_' + runid + '_v'+str(config["numvehicles"])+ '.csv')
         formatted_df = format_df(out_df)
         formatted_df.to_csv('REPORTING\\aggreport' + runid + '_v'+str(config["numvehicles"])+ '.csv')
@@ -777,12 +783,16 @@ def eventReport(event, write, runid, idle):
     ttl_walk = walkO + walkD
     VMT = 0
     sVMT = 0
+    eVMT = 0
     route = obj.get_route()
     for n in range(len(route)-1):
         VMT += edgeDict[route[n],route[n+1]].get_length()
     if obj.get_shared_VMT != []:
         for n in range(len(obj.get_shared_VMT())-1):
-            sVMT += edgeDict[route[n],route[n+1]].get_length()        
+            sVMT += edgeDict[route[n],route[n+1]].get_length() 
+    if obj.get_empty_VMT != []:
+        for n in range(len(obj.get_empty_VMT())-1):
+            eVMT += edgeDict[route[n],route[n+1]].get_length()  
     out = [event.get_eTime()\
            ,event.get_eType()\
            ,obj.get_ID()\
@@ -795,7 +805,8 @@ def eventReport(event, write, runid, idle):
            ,obj.get_dPUDO().get_ID()\
            ,route\
            ,VMT\
-           ,sVMT
+           ,sVMT\
+           ,eVMT\
            ,walkO\
            ,walkD\
            ,ttl_walk\
