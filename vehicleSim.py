@@ -523,7 +523,7 @@ def rideshareLogic(ride, schedule):
     rideClusters = []
     for nod in ride.get_route():
         ###build a list of clusters adjacent to the requested ride###
-        rideClusters+=adjDict[nodeDict[nod].get_cluster()]
+        rideClusters.append(nodeDict[nod].get_cluster())
         ##rideClusters.append(nodeDict[nod].get_cluster()) 
     for rkey in enrouteDict.keys():
         ###for each of the routes currently enroute###
@@ -547,7 +547,7 @@ def rideshareLogic(ride, schedule):
             if timesum > elapsed:
                 ###the evaluated node has not yet been reached by the vehicle###
                 ###add its adjacent clusters to our route cluster list###
-                adjClusters += adjDict[nodeDict[str(route[pos])].get_cluster()]
+                adjClusters.append(nodeDict[str(route[pos])].get_cluster())
         adjClusters = list(set(adjClusters))
         try:
             adjClusters.pop(adjClusters.index(finalCluster))
@@ -663,7 +663,7 @@ def reallocateVehicles(schedule, currTime, relocnum):
         vCount2[it].append(vCount2[it][3]/(vCount2[it][2])) #removed a -1 in denominator
     needs_vehicles = []
     for macroCluster in vCount2.keys():
-        if vCount2[macroCluster][4] < .20*(config["numvehicles"]/len(PUDOs)):
+        if vCount2[macroCluster][4] < .15*(config["numvehicles"]/len(PUDOs)):
             ##shifted to 1.5 to check runtime
             needs_vehicles.append(macroCluster)
             ###this cluster needs vehicles###
@@ -706,6 +706,10 @@ def reallocateVehicles(schedule, currTime, relocnum):
                 #recalc vehicles / pudo including excluding the enroute vehicles
                 vCount2[clus][4] = vCount2[clus][1]/vCount2[clus][2]
                 vCount2[clus][5] = vCount2[clus][3]/(vCount2[clus][2]) #removed a -1 in denominator
+        elif oPUDO == 'skip':
+            #no spare vehicles to be reallocated
+            print('cluster with greatest number of vehicle cannot spare vehicles')
+            return schedule,relocnum
     #print('no vehicles need to be reallocated')
     return schedule, relocnum
 def masterEventHandler(event, schedule):
