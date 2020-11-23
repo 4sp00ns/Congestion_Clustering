@@ -431,14 +431,16 @@ def findNearestVehicle(ride, schedule):
     while max(list(map(lambda nearbyPUDOs: nearbyPUDOs.get_capacity(), nearbyPUDOs))) == 0:
          print('DEBUG no vehicles at adj level',currlen,'@',ride.get_origin(),'extending search')
          pta = []
+         newClus=[]
          for nbyp in nearbyPUDOs:
              clus = nbyp.get_cluster()
-             newClus = list(adjDict[clus])
-             for nc in newClus:
-                 newPUDOs = list(clusterPUDOs[nc])
-                 for npp in newPUDOs:
-                     if npp not in nearbyPUDOs:
-                         pta.append(npp)
+             newClus += list(adjDict[clus])
+         newClus = list(set(newClus))
+         for nc in newClus:
+            newPUDOs = list(clusterPUDOs[nc])
+            for npp in newPUDOs:
+                if npp not in nearbyPUDOs:
+                    pta.append(npp)
          nearbyPUDOs += pta
                          
 #         newNodes = []
