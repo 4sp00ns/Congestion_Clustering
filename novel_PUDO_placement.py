@@ -7,7 +7,10 @@ Created on Tue Oct 20 21:46:08 2020
 from matplotlib import pyplot as plt
 import numpy
 import networkx as nx
-from pudo_work import bruteCoord
+from pudo_work import bruteCoord, run_kmeans
+
+(nodeDict,edgeDict) = ATXxmlparse.getSDBNetworkTopo()
+createNetwork()
 
 def createRatioDicts(urban_core_nodes):
     congestionRatios = {}
@@ -16,7 +19,7 @@ def createRatioDicts(urban_core_nodes):
     outD3 = {}
     for node in nodeDict.keys():
         #if [int(node), nodeDict[node].get_lat(), nodeDict[node].get_long()] in urban_core_nodes:
-        print(node)
+        #print(node)
         adjnodes = []
         congestionRatios[node] = []
         neighbors = list(ATXnet.neighbors(node))
@@ -76,7 +79,31 @@ def choosePUDOs(numpudos, ratioDict, typename):
                                 ,index=False)
     return newPUDOs
 
+
+def num_UC_clusters(clusterfile):
+    uc = pd.read_csv('urban_core_nodes.csv', dtype = {'id':np.str\
+                                    ,'lat':np.float64\
+                                    ,'long':np.float64}).values.tolist()
+    df_cl = pd.read_csv('CLUSTERS\\'+clusterfile+'.csv'\
+                          ,dtype = {'id':np.str\
+                                    ,'lat':np.float64\
+                                    ,'long':np.float64\
+                                    ,'cluster':np.str})
+    #print(df_cl.columns)
+    clusterD = {}
+    #df_cl['id'] = df_cl['Unnamed']
+    clusterList = df_cl[['id','cluster']].values.tolist()
+    for cl in clusterList:
+        clusterD[cl[0]] = cl[1]
+    clustout = []
+    for nn in uc:
+        clustout.append(clusterD[nn[0]])
+    clustout = list(set(clustout))
+    #print(clustout)
+    return clustout
 #stdDict, meanDict, rngDict = createRatioDicts()
+    
+
 def residualPUDOs(newPUDOs):
     #finds distant PUDOs
     ct = 0
@@ -172,7 +199,14 @@ def build_hybrid_pudos(current_clusterfile, urban_core, rangeD):
         if cL[3] not in core_cluster:
             newPUDOs.append(cL[:3])
     #print(len(newPUDOs))
-    centroidPUDOs, congestPUDOs = define_PUDOs(newPUDOs, trunc_cl, rangeD)
+    if 'kmean' not in current_clusterfile:
+        print('non kmean cluster')
+        centroidPUDOs, congestPUDOs = define_PUDOs(newPUDOs, trunc_cl, rangeD)
+    elif 'kmean' in current_clusterfile:
+        print('kmean clusters')
+        kmeanfix = count_correct_kmeans_PUDOS(current_clusterfile.replace('kmean_nodeweight','asynccongest'))
+        print('DEBUG',kmeanfix[0])
+        centroidPUDOs, congestPUDOs = define_PUDOs(newPUDOs, kmeanfix, rangeD)
     pd.DataFrame(centroidPUDOs, columns=['id','lat','long'])\
             .to_csv('PUDOS\\PUDOs_UCentroid_'+current_clusterfile[12:]+'.csv', index=False)
     pd.DataFrame(congestPUDOs, columns=['id','lat','long'])\
@@ -180,15 +214,17 @@ def build_hybrid_pudos(current_clusterfile, urban_core, rangeD):
     return centroidPUDOs, congestPUDOs
 
 def define_PUDOs(newPUDOs, clusterList, ratioDict):
+    print('DEBUG CLUSTERLIST', clusterList[0:3])
     centroidPUDOs = newPUDOs.copy()
     congestPUDOs = newPUDOs.copy()
     clusterNodes = {}
     centDict = {}
     clusDict = {}
     for cl in clusterList:
-        clusterNodes[cl[3]] = []
+        clusterNodes[str(cl[3])] = []
     for cl in clusterList:
-        clusterNodes[cl[3]].append(nodeDict[str(cl[0])])
+        clusterNodes[str(cl[3])].append(nodeDict[str(cl[0])])
+    print('number of PUDOS to build',len(clusterNodes))
     for nl in clusterNodes.values():
         mrat = 0
         for nodelet in nl:
@@ -233,8 +269,28 @@ def test_async():
     cl2 = []
     #for uc in urban_core:
      #   if 
+     
+def count_correct_kmeans_PUDOS(asyncclusterfile):
+    uc_df = pd.read_csv('urban_core_nodes.csv', dtype = {'id':np.str\
+                                    ,'lat':np.float64\
+                                    ,'long':np.float64})
+    urban_core_ll = uc_df[['lat','long']].values.tolist()
+    urban_core = uc_df.values.tolist()
+    numToCreate = len(num_UC_clusters(asyncclusterfile))
+    print(numToCreate)
+    kmd = run_kmeans(urban_core_ll, numToCreate)
+    cluslist = kmd[1].tolist()
+    ctt = 0
+    for uc in urban_core:
+        uc.append(cluslist[ctt])
+        ctt+=1
+    return urban_core
+     
+     
 def master(clusterfile):
-    urban_core = pd.read_csv('urban_core_nodes.csv').values.tolist()
+    urban_core = pd.read_csv('urban_core_nodes.csv', dtype = {'id':np.str\
+                                    ,'lat':np.float64\
+                                    ,'long':np.float64}).values.tolist()
     ratioDict = createRatioDicts(urban_core)
     build_hybrid_pudos(clusterfile, urban_core, ratioDict)
     
