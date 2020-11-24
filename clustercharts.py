@@ -61,7 +61,10 @@ def getClusterAdjacencies():
 def build_cluster_graph(ctdict):
     ATXcluster = nx.Graph()
     for aj in adjDict.keys():
-        ATXcluster.add_node(aj, size = ctdict[aj])
+        ATXcluster.add_node(aj\
+                            , size = ctdict[aj]\
+                            , lat = nodeDict[str(aj)].get_lat()*1000\
+                            , lng = nodeDict[str(aj)].get_long()*1000)
     for aj in adjDict.keys():
         for adj in adjDict[aj]:
             if aj != adj:
