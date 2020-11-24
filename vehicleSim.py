@@ -844,6 +844,7 @@ def stateReport(verbose, schedule, idle, event):
         print('vehicles at PUDOs',pv)
         print('total vehicles = ',ttl)
     idle.append([event.get_eTime(), pv, currEnroute, currRealloc, currRideshare])
+
     return pv, ttl, idle
 
 def getNextEvent(schedule):
@@ -892,6 +893,12 @@ def simMaster(configfile):
             if ttl < config["numvehicles"]-1:
                 print('missing vehicles, killing sim')
                 return (enrouteDict, schedule, event, idle)
+            for cp in clusterPUDOs.keys():
+                if len(clusterPUDOs[cp]) < 0:
+                    print('#####################DEBUG###############')
+                    print('clusterPUDOS has shifted')
+                    print('###############DEBUG####################')
+                    return (enrouteDict, schedule, event, idle)
 
     except Exception as e:
         print(e)

@@ -7,10 +7,34 @@ Created on Tue Oct 20 21:46:08 2020
 from matplotlib import pyplot as plt
 import numpy
 import networkx as nx
-from pudo_work import bruteCoord, run_kmeans
+from pudo_work import bruteCoord, run_kmeans, load_gtraffic
+import ATXxmlparse
+import numpy as np
+import pandas as pd
 
+global nodeDict, edgeDict
 (nodeDict,edgeDict) = ATXxmlparse.getSDBNetworkTopo()
-createNetwork()
+def createNetwork():
+    print('building network')
+    global ATXnet, ATXcongest, ATXnet_undir, ATXcongest_undir, dynamic_net
+    load_gtraffic(edgeDict)
+    ATXnet = nx.DiGraph()
+    ATXnet_undir = nx.Graph()
+    ATXcongest = nx.DiGraph()
+    ATXcongest_undir = nx.Graph()
+    ATXnet.add_nodes_from(nodeDict.keys())
+    ATXcongest.add_nodes_from(nodeDict.keys())
+    for e in edgeDict.keys():
+        if e[0] != e[1]:
+            ATXnet.add_edge(e[0],e[1],weight=float(edgeDict[e].get_duration()))
+            ATXnet_undir.add_edge(e[0],e[1],weight=float(edgeDict[e].get_duration()))
+            try:
+                congested_dur = max([edgeDict[e].get_congested_duration(), edgeDict[e[::-1]].get_congested_duration()])
+            except:
+                congested_dur = edgeDict[e].get_congested_duration()
+            ATXcongest.add_edge(e[0],e[1],weight=float(edgeDict[e].get_congested_duration()))
+            ATXcongest_undir.add_edge(e[0],e[1],weight=float(congested_dur))
+    dynamic_net = ATXnet
 
 def createRatioDicts(urban_core_nodes):
     congestionRatios = {}
@@ -185,6 +209,8 @@ def build_hybrid_pudos(current_clusterfile, urban_core, rangeD):
                                     ,'long':np.float64\
                                     ,'cluster':np.str})\
                         .values.tolist()
+    print(clusterList[0])
+    print(urban_core[0:5])
     #urban_core = pd.read_csv('urban_core_nodes.csv').values.tolist()
     core_cluster = []
     newPUDOs = []
@@ -196,9 +222,10 @@ def build_hybrid_pudos(current_clusterfile, urban_core, rangeD):
             core_cluster = list(set(core_cluster))
             trunc_cl.append(cL)
     for cL in clusterList:
-        if cL[3] not in core_cluster:
+        if str(cL[3]) not in core_cluster:
             newPUDOs.append(cL[:3])
-    #print(len(newPUDOs))
+    print('DEBUG: len core clusters',len(core_cluster))
+    print(len(newPUDOs))
     if 'kmean' not in current_clusterfile:
         print('non kmean cluster')
         centroidPUDOs, congestPUDOs = define_PUDOs(newPUDOs, trunc_cl, rangeD)
@@ -294,3 +321,4 @@ def master(clusterfile):
     ratioDict = createRatioDicts(urban_core)
     build_hybrid_pudos(clusterfile, urban_core, ratioDict)
     
+createNetwork()
