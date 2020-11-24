@@ -17,6 +17,10 @@ import numpy as np
 import networkx as nx
 import ATXxmlparse
 from matplotlib import pyplot as plt
+from pyspark.sql import SparkSession
+import pyspark.sql.functions as F
+spark = SparkSession.builder.getOrCreate()
+
 def clustersizehist(clusterfile):
     clusterList = pd.read_csv('CLUSTERS\\'+clusterfile+'.csv'\
                                   ,dtype = {'id':np.int\
@@ -61,10 +65,20 @@ def getClusterAdjacencies():
 def build_cluster_graph(ctdict):
     ATXcluster = nx.Graph()
     for aj in adjDict.keys():
+        sumlat = 0
+        sumlong = 0
+        ct = 0
+        for n in nodeDict:
+            if nodeDict[n].get_cluster() == aj:
+                sumlat += nodeDict[n].get_lat()
+                sumlong += nodeDict[n].get_long()
+                ct += 1
+        sumlat = sumlat / ct
+        sumlong = sumlong / ct
         ATXcluster.add_node(aj\
-                            , size = ctdict[aj]\
-                            , lat = nodeDict[str(aj)].get_lat()*1000\
-                            , lng = nodeDict[str(aj)].get_long()*1000)
+                            , sz = ctdict[aj]\
+                            , lat = sumlat*1000\
+                            , lng = sumlong*1000)
     for aj in adjDict.keys():
         for adj in adjDict[aj]:
             if aj != adj:
@@ -78,7 +92,7 @@ def master(clustfile):
     adjDict = getClusterAdjacencies()
     clusd = {}
     #print(clusterList)
-    ct = 1
+    ct = 0
     for cl in clusterList:
         #print('adding cluster', cl)
         clusd[ct] = cl
@@ -86,6 +100,14 @@ def master(clustfile):
     #print(clusd)
     ATXcluster = build_cluster_graph(clusd)
     nx.write_graphml(ATXcluster, clustfile+'.graphml')
+    return adjDict
+
+def master2(clustfile):
+    df_r = spark.read.options(header='True').options(inferschema = 'True').csv('reporting_'+str(vc)+'.csv')\
+            .filter(col('type') == lit('Dropped'))\
+            .withColumn('hour', hour(col('hail_time')))\
+            .select('hour')\
+            .groupBy('hour').agg(count(col('hour')).alias('dropped_rides_'+str(vc)))
 # ATXnet.add_nodes_from(nodeDict.keys())
 #     ATXcongest.add_nodes_from(nodeDict.keys())
 #     for e in edgeDict.keys():
