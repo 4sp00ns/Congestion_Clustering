@@ -425,7 +425,7 @@ def assignVehicle(ride, schedule): #,enrouteDict):
     return schedule
 def findNearestVehicle(ride, schedule):
     nearbyPUDOs = list(clusterPUDOs[nodeDict[ride.get_origin()].get_cluster()]) #[PUDOs[ride.get_oPUDO().get_ID()]]#
-        
+    print('DEBUG CLUSTERPUDOS', nodeDict[ride.get_origin()].get_cluster(), clusterPUDOs[nodeDict[ride.get_origin()].get_cluster()])    
     currlen = len(nearbyPUDOs)
     #print('cluster',nodeDict[ride.get_origin()].get_cluster(),'len nearbypudos',len(nearbyPUDOs))
     while max(list(map(lambda nearbyPUDOs: nearbyPUDOs.get_capacity(), nearbyPUDOs))) == 0:
@@ -903,9 +903,9 @@ def simMaster(configfile):
     except Exception as e:
         print(e)
         traceback.print_exc()
-        return(enrouteDict, schedule, event, idle)
+        return(enrouteDict, schedule, event, idle, clusterPUDOs, PUDOs)
     eventReport(None, True, runid, idle)
-    return (enrouteDict, schedule, None, idle)
+    return (enrouteDict, schedule, None, idle, clusterPUDOs, PUDOs)
 
         
     
