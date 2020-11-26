@@ -14,13 +14,14 @@ from pyspark.sql.functions import col, year, month, hour, when, dayofweek\
 , avg, dayofyear, to_timestamp, minute, second, lit, count
 from matplotlib import pyplot as plt
 import pandas as pd
+import numpy as np
 from pyspark.sql.types import IntegerType, LongType
 
 spark = SparkSession.builder.getOrCreate()
 
 def vehicle_charts(sens):
     
-    numv = int(sens.split('_')[1][1:])
+    numv = int(sens.split('_')[3][1:])
     minutelist = []
     for m in range(0,1440):
         minutelist.append(m)
@@ -28,11 +29,13 @@ def vehicle_charts(sens):
     df = df.withColumnRenamed('value','m')
     #########NEEDS MINLIST AS AN INPUT#############
     df3 = spark.read.options(header='True').options(inferschema = 'True').csv('vreport_'+sens+'.csv')\
-        .withColumn('Idle Vehicles',(col('vehicles_at_PUDOs')+col('vehicles reallocating'))/numv)\
+        .withColumn('Idle Vehicles at PUDOs',(col('vehicles_at_PUDOs'))/numv)\
         .withColumn('Enroute non-rideshare',(col('vehicles_enroute')-col('num_rideshares'))/numv)\
         .withColumn('Ridesharing Vehicles',col('num_rideshares')/numv)\
+        .withColumn('Reallocating Vehicles',col('vehicles reallocating')/numv)\
         .drop('vehicles_at_PUDOs')\
         .drop('vehicles_enroute')\
+        .drop('vehicles reallocating')\
         .drop('num_rideshares')
     
     #df2 = spark.read.options(header='True').options(inferschema = 'True').csv('aggreportvehiclesensitivities_v17500.csv')\
@@ -58,8 +61,8 @@ def vehicle_charts(sens):
     plt.ylabel('% total vehicles', fontsize=15)
     plt.xlabel('minute', fontsize = 15)
     plt.legend(fontsize=15)
-    plt.title('vehicle behavior - '+ str(numv) + ' vehicle sensitivity', fontsize = 20)
-    df.select('vehicles reallocating').toPandas().plot()
+    plt.title('Fleet Operations - n='+ str(numv), fontsize = 20)
+    #df.select('vehicles reallocating').toPandas().plot()
     #df2.toPandas().plot()
     #df3.toPandas().plot()
     
@@ -193,6 +196,54 @@ def dropped_vehicle_chart(senslist):
     plt.legend(fontsize=15)
     return df_p
 
+
+def dropped_vehicle_ttl(senslist):
+#    minutelist = []
+#    for m in range(0,1440):
+#        minutelist.append(m)
+#    df = spark.createDataFrame(minutelist, IntegerType())
+#    df = df.withColumnRenamed('value','m')
+    
+    hourlist = []
+    for h in range(0,24):
+        hourlist.append(h)
+    df = spark.createDataFrame(hourlist, IntegerType())
+    df = df.withColumnRenamed('value','h')
+#    df = spark.read.options(header='True').options(inferschema = 'True').csv('reporting_vehiclesensitivities_v7500.csv')\
+#        .filter(col('type') == lit('Dropped'))\
+#        .withColumn('minute', minute(col('hail_time'))+hour(col('hail_time'))*60)\
+#        .select('minute')\
+#        .groupBy('minute').agg(count(col('minute')).alias('dropped_vehicles_7500'))\
+#        .orderBy('minute')\
+#        .withColumnRenamed('minute','m')
+    if senslist == '':
+        senslist = ['v5000','v6000','v7500','v10000','v12500','v15000']
+    for vc in senslist:
+        namestring = vc.split('_')[-1:][0]
+        print(namestring)
+        dfj = spark.read.options(header='True').options(inferschema = 'True').csv('reporting_'+str(vc)+'.csv')\
+            .filter(col('type') == lit('Dropped'))\
+            .withColumn('hour', hour(col('hail_time')))\
+            .select('hour')\
+            .groupBy('hour').agg(count(col('hour')).alias('dropped_rides_'+str(vc)))
+
+        df = df.join(dfj\
+                     ,dfj.hour == df.h\
+                     ,how = 'outer')\
+                     .drop('hour')
+
+        df = df.withColumn('ttl_dropped_'+ namestring, col('dropped_rides_'+str(vc)))\
+            .drop('dropped_rides_'+str(vc))  
+    df = df.orderBy('h').drop('h')
+    df_p = df.toPandas()
+    df_p.plot()
+    plt.xticks(fontsize = 15)
+    plt.yticks(fontsize = 15)
+    plt.ylabel('Total Dropped Rides per Hour', fontsize=15)
+    plt.xlabel('hour of the day', fontsize = 15)
+    plt.legend(fontsize=15)
+    return df_p
+
 def VMT_chart(senslist):
 #    minutelist = []
 #    for m in range(0,1440):
@@ -240,15 +291,9 @@ def VMT_chart(senslist):
     plt.legend(fontsize=15)
     return df_p
 
-def dropped_VMT_chart(senslist):
-#    minutelist = []
-#    for m in range(0,1440):
-#        minutelist.append(m)
-#    df = spark.createDataFrame(minutelist, IntegerType())
-#    df = df.withColumnRenamed('value','m')
-    
+def peak_VMT_chart(senslist):
     hourlist = []
-    for h in range(0,24):
+    for h in [7,8,16,17,18,19]:
         hourlist.append(h)
     df = spark.createDataFrame(hourlist, IntegerType())
     df = df.withColumnRenamed('value','h')
@@ -259,6 +304,40 @@ def dropped_VMT_chart(senslist):
 #        .groupBy('minute').agg(count(col('minute')).alias('dropped_vehicles_7500'))\
 #        .orderBy('minute')\
 #        .withColumnRenamed('minute','m')
+    if senslist == '':
+        senslist = ['v5000','v6000','v7500','v10000','v12500','v15000']
+    for vc in senslist:
+        dfj = spark.read.options(header='True').options(inferschema = 'True').csv('reporting_'+str(vc)+'.csv')\
+            .filter((col('type') == lit('Arrival'))|(col('type') == lit('Rideshare'))|(col('type') == lit('Reallocation')))\
+            .withColumn('hour', hour(col('hail_time')))\
+            .withColumn('VMTa',(col('VMT')-col('shared_VMT')/2)/5280)\
+            .drop('VMT')\
+            .select('hour', 'VMTa')\
+            .groupBy('hour').agg(F.sum(col('VMTa')).alias('TotalVMT'+str(vc)))
+        df = df.join(dfj\
+                     ,dfj.hour == df.h\
+                     ,how = 'inner')
+    df = df.orderBy('h').drop('h')
+    for ccol in df.columns:
+        if 'kmean' in ccol:
+            df = df.withColumnRenamed(ccol, 'Total VMT K-Means')
+            df = df.withColumnRenamed('TotalVMTcsens7500_1750_v7500','Total VMT AFC')
+    df_p = df.toPandas()
+    df_p.plot()
+    plt.xticks(fontsize = 15)
+    plt.yticks(fontsize = 15)
+    plt.ylabel('Total VMT',fontsize=15)
+    plt.xlabel('hour of the day',fontsize=15)
+    plt.legend(fontsize=15)
+    return df_p
+
+def dropped_VMT_chart(senslist):
+    
+    hourlist = []
+    for h in range(0,24):
+        hourlist.append(h)
+    df = spark.createDataFrame(hourlist, IntegerType())
+    df = df.withColumnRenamed('value','h')
     if senslist == '':
         senslist = ['v5000','v6000','v7500','v10000','v12500','v15000']
     for vc in senslist:
@@ -391,8 +470,10 @@ def ride_time_chart(senslist):
     for vc in senslist:
         dfj = spark.read.options(header='True').options(inferschema = 'True').csv('reporting_'+str(vc)+'.csv')\
             .filter((col('type') == lit('Arrival'))|(col('type') == lit('Rideshare')))\
-            .withColumn('hour', hour(col('hail_time')))\
-            .withColumn('ride_time',(col("arrival_time").cast("long")-col('hail_time').cast("long"))/60)\
+            .withColumn('ht_ts',F.to_timestamp(col('hail_time')))\
+            .withColumn('hour', hour(col('ht_ts')))\
+            .withColumn('at_ts',F.to_timestamp(col('arrival_time')))\
+            .withColumn('ride_time',(col("at_ts").cast("long")/60)-(col('ht_ts').cast("long"))/60)\
             .select('hour', 'ride_time')\
             .groupBy('hour').agg(F.avg(col('ride_time')).alias('AverageRideTime'+str(vc)))
         df = df.join(dfj\
@@ -402,8 +483,11 @@ def ride_time_chart(senslist):
     df = df.orderBy('h').drop('h')
     df_p = df.toPandas()
     df_p.plot()
-    plt.ylabel('Average Ride Time (minutes)')
-    plt.xlabel('hour of the day')
+    plt.ylabel('Average Ride Time (minutes)',fontsize = 15)
+    plt.xlabel('hour of the day',fontsize = 15)
+    plt.xticks(fontsize = 15)
+    plt.yticks(fontsize = 15)
+    plt.legend(fontsize=15)
     return df_p
 
 def detour_time(senslist):
@@ -553,15 +637,8 @@ def detour_total(senslist):
         df_p = df2.toPandas()
         print(df_p.head(1))
     return df_p
-#sens = vehiclesensitivities_v10000
-#df3 = spark.read.options(header='True').options(inferschema = 'True').csv('reporting_'+sens+'.csv')\
-#            .filter(col('type') == lit('Dropped'))\
-#            .withColumn('minute', minute(col('hail_time'))+hour(col('hail_time'))*60)\
-#            .select('minute')\
-#            .groupBy('minute').agg(count(col('minute')).alias('dropped_vehicles'))\
-#            .orderBy('minute')\
-#            .withColumnRenamed('minute','m')
-def uc_chart(senslist, strvar):
+
+def uc_walk(senslist):
 #    minutelist = []
 #    for m in range(0,1440):
 #        minutelist.append(m)
@@ -585,15 +662,16 @@ def uc_chart(senslist, strvar):
         senslist = ['v5000','v6000','v7500','v10000','v12500','v15000']
     for vc in senslist:
         if "centroid" in vc:
-            lbl = 'Centroid PUDOs'
+            lbl = 'Congestion Range PUDOs'
         else:
-            lbl = 'Cluster PUDOs'
+            lbl = 'Centroid PUDOs'
         dfj = spark.read.options(header='True').options(inferschema = 'True').csv('reporting_'+str(vc)+'.csv')\
             .filter((col('type') == lit('Arrival'))|(col('type') == lit('Rideshare')))\
             .withColumn('hour', hour(col('hail_time')))\
-            .select('hour', strvar,'origin','destination')
-        dfj.filter(col('dPUDO') != col('destination')).show()
-        print(dfj.dtypes)
+            .withColumn('walktime', col("total_walk")/lit(4.4)/lit(60))\
+            .select('hour', "walktime",'origin','destination')
+        #dfj.filter(col('dPUDO') != col('destination')).show()
+        #print(dfj.dtypes)
         df1 = dfj.join(df_uc\
                        ,dfj.origin == df_uc.id\
                        ,how = 'inner')\
@@ -603,8 +681,8 @@ def uc_chart(senslist, strvar):
                        ,how = 'inner')\
                        .drop('id')
         df1 = df1.union(df2)
-        df1 = df1.select('hour',strvar)\
-                .groupBy('hour').agg(F.sum(col(strvar)).alias(strvar + ' in Urban Core'+lbl))
+        df1 = df1.select('hour','walktime')\
+                .groupBy('hour').agg(F.sum(col('walktime')).alias('Avg Walk Time in Urban Core'+lbl))
 
         df = df.join(df1\
                      ,df1.hour == df.h\
@@ -613,11 +691,140 @@ def uc_chart(senslist, strvar):
     df = df.orderBy('h').drop('h')
     df_p = df.toPandas()
     df_p.plot()
-    plt.ylabel('Total Walk Distance (feet)')
-    plt.xlabel('hour of the day')
+    plt.ylabel('Average Walk Time (minutes)', fontsize=15)
+    plt.xlabel('hour of the day', fontsize=15)
+    plt.xticks(fontsize = 15)
+    plt.yticks(fontsize = 15)
+    plt.legend(fontsize=15)
     return df_p
 
+def uc_vmt(senslist):
+#    minutelist = []
+#    for m in range(0,1440):
+#        minutelist.append(m)
+#    df = spark.createDataFrame(minutelist, IntegerType())
+#    df = df.withColumnRenamed('value','m')
+    df_uc = spark.read.options(header='True').options(inferschema = 'True').csv('urban_core_nodes.csv')\
+        .select("id")
+    hourlist = []
+    for h in range(0,24):
+        hourlist.append(h)
+    df = spark.createDataFrame(hourlist, IntegerType())
+    df = df.withColumnRenamed('value','h')
+#    df = spark.read.options(header='True').options(inferschema = 'True').csv('reporting_vehiclesensitivities_v7500.csv')\
+#        .filter(col('type') == lit('Dropped'))\
+#        .withColumn('minute', minute(col('hail_time'))+hour(col('hail_time'))*60)\
+#        .select('minute')\
+#        .groupBy('minute').agg(count(col('minute')).alias('dropped_vehicles_7500'))\
+#        .orderBy('minute')\
+#        .withColumnRenamed('minute','m')
+    if senslist == '':
+        senslist = ['v5000','v6000','v7500','v10000','v12500','v15000']
+    for vc in senslist:
+        if "centroid" in vc:
+            lbl = 'Congestion Range PUDOs'
+        else:
+            lbl = 'Centroid PUDOs'
+        dfj = spark.read.options(header='True').options(inferschema = 'True').csv('reporting_'+str(vc)+'.csv')\
+            .filter((col('type') == lit('Arrival'))|(col('type') == lit('Rideshare')))\
+            .withColumn('hour', hour(col('hail_time')))\
+            .withColumn('VMTa',(col('VMT')-col('shared_VMT')/2)/5280)\
+            .drop('VMT')\
+            .select('hour', 'VMTa','origin','destination')
 
+        #dfj.filter(col('dPUDO') != col('destination')).show()
+        #print(dfj.dtypes)
+        df1 = dfj.join(df_uc\
+                       ,dfj.origin == df_uc.id\
+                       ,how = 'inner')\
+                       .drop('id')
+        df2 = dfj.join(df_uc\
+                       ,dfj.destination == df_uc.id\
+                       ,how = 'inner')\
+                       .drop('id')
+        df1 = df1.union(df2)
+        df1 = df1.select('hour','VMTa')\
+                .groupBy('hour').agg(F.sum(col('VMTa')).alias('Total VMT - Urban Core Trips'+lbl))
+
+        df = df.join(df1\
+                     ,df1.hour == df.h\
+                     ,how = 'outer')\
+                     .drop('hour')
+    df = df.orderBy('h').drop('h')
+    df_p = df.toPandas()
+    df_p.plot()
+    plt.xticks(fontsize = 15)
+    plt.yticks(fontsize = 15)
+    plt.ylabel('Total VMT',fontsize=15)
+    plt.xlabel('hour of the day',fontsize=15)
+    plt.legend(fontsize=15)
+    return df_p
+
+def uc_ridetime(senslist):
+#    minutelist = []
+#    for m in range(0,1440):
+#        minutelist.append(m)
+#    df = spark.createDataFrame(minutelist, IntegerType())
+#    df = df.withColumnRenamed('value','m')
+    df_uc = spark.read.options(header='True').options(inferschema = 'True').csv('urban_core_nodes.csv')\
+        .select("id")
+    hourlist = []
+    for h in range(0,24):
+        hourlist.append(h)
+    df = spark.createDataFrame(hourlist, IntegerType())
+    df = df.withColumnRenamed('value','h')
+#    df = spark.read.options(header='True').options(inferschema = 'True').csv('reporting_vehiclesensitivities_v7500.csv')\
+#        .filter(col('type') == lit('Dropped'))\
+#        .withColumn('minute', minute(col('hail_time'))+hour(col('hail_time'))*60)\
+#        .select('minute')\
+#        .groupBy('minute').agg(count(col('minute')).alias('dropped_vehicles_7500'))\
+#        .orderBy('minute')\
+#        .withColumnRenamed('minute','m')
+    if senslist == '':
+        senslist = ['v5000','v6000','v7500','v10000','v12500','v15000']
+    for vc in senslist:
+        if "centroid" in vc:
+            lbl = 'Congestion Range PUDOs'
+        else:
+            lbl = 'Centroid PUDOs'
+        dfj = spark.read.options(header='True').options(inferschema = 'True').csv('reporting_'+str(vc)+'.csv')\
+            .filter((col('type') == lit('Arrival'))|(col('type') == lit('Rideshare')))\
+            .withColumn('ht_ts',F.to_timestamp(col('hail_time')))\
+            .withColumn('hour', hour(col('ht_ts')))\
+            .withColumn('at_ts',F.to_timestamp(col('arrival_time')))\
+            .withColumn('ride_time',(col("at_ts").cast("long")/60)-(col('ht_ts').cast("long"))/60)\
+            .withColumn('walk_time',col("total_walk")/lit(4.4)/lit(60))\
+            .withColumn('total_travel_time',col('ride_time') + col('walk_time'))\
+            .select('hour', 'total_travel_time', 'origin','destination')
+
+        #print(dfj.show())
+        #dfj.filter(col('dPUDO') != col('destination')).show()
+        #print(dfj.dtypes)
+        df1 = dfj.join(df_uc\
+                       ,dfj.origin == df_uc.id\
+                       ,how = 'inner')\
+                       .drop('id')
+        df2 = dfj.join(df_uc\
+                       ,dfj.destination == df_uc.id\
+                       ,how = 'inner')\
+                       .drop('id')
+        df1 = df1.union(df2)
+        df1 = df1.select('hour','total_travel_time')\
+                .groupBy('hour').agg(F.sum(col('total_travel_time')).alias('Total Travel Time - Urban Core Trips'+lbl))
+
+        df = df.join(df1\
+                     ,df1.hour == df.h\
+                     ,how = 'outer')\
+                     .drop('hour')
+    df = df.orderBy('h').drop('h')
+    df_p = df.toPandas()
+    df_p.plot()
+    plt.xticks(fontsize = 15)
+    plt.yticks(fontsize = 15)
+    plt.ylabel('Total Travel Time (minutes)',fontsize=15)
+    plt.xlabel('hour of the day',fontsize=15)
+    plt.legend(fontsize=15)
+    return df_p
 
 def histogram(sens, strvar):
     pass
@@ -632,3 +839,43 @@ plt.rcParams["figure.figsize"] = [15, 10]
 #     dfj = spark.read.options(header='True').options(inferschema = 'True').csv('reporting_'+sens+'.csv')\
 #     .where(col('ID').like("%reloc%"))\
 #     .select('destination')
+
+def walk_ride_scatter(sens):
+    dfj = spark.read.options(header='True').options(inferschema = 'True').csv('reporting_'+sens[0]+'.csv')\
+            .filter((col('type') == lit('Arrival'))|(col('type') == lit('Rideshare')))\
+            .filter(col('total_walk') > lit(0))\
+            .withColumn('ht_ts',F.to_timestamp(col('hail_time')))\
+            .withColumn('hour', hour(col('ht_ts')))\
+            .withColumn('at_ts',F.to_timestamp(col('arrival_time')))\
+            .withColumn('ride_time1',(col("at_ts").cast("long")/60)-(col('ht_ts').cast("long"))/60)\
+            .withColumn('walk_time1',col("total_walk")/lit(4.4)/lit(60))\
+            .select('id','walk_time1','ride_time1')
+    dfk = spark.read.options(header='True').options(inferschema = 'True').csv('reporting_'+sens[1]+'.csv')\
+            .filter((col('type') == lit('Arrival'))|(col('type') == lit('Rideshare')))\
+            .filter(col('total_walk') > lit(0))\
+            .withColumn('ht_ts',F.to_timestamp(col('hail_time')))\
+            .withColumn('hour', hour(col('ht_ts')))\
+            .withColumn('at_ts',F.to_timestamp(col('arrival_time')))\
+            .withColumn('ride_time2',(col("at_ts").cast("long")/60)-(col('ht_ts').cast("long"))/60)\
+            .withColumn('walk_time2',col("total_walk")/lit(4.4)/lit(60))\
+            .select('id','walk_time2','ride_time2')\
+            .withColumnRenamed('id','idd')
+    df = dfj.join(dfk\
+                  ,dfj.id == dfk.idd\
+                  ,how = 'inner')\
+                    .drop('idd')
+    df = df.withColumn('walk_time_delta',col('ride_time1')-col('ride_time2'))\
+            .withColumn('ride_time_delta',col('walk_time2')-col('walk_time1'))\
+            .drop('walk_time1','walk_time2','ride_time1','ride_time2','id')
+    df_p = df.toPandas()
+    df_p = df_p[['walk_time_delta','ride_time_delta']]
+    x = df_p['walk_time_delta']
+    y = df_p['ride_time_delta']
+    plt.scatter(x,y)
+    z = np.polyfit(x,y, 1)
+    print(z)
+    p = np.poly1d(z)
+    plt.plot(x,p(x),"r--")
+    plt.xlabel('walk_time_delta',fontsize=15)
+    plt.ylabel('ride_time_delta',fontsize=15)
+    plt.show()
