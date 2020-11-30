@@ -3,15 +3,15 @@
 "tripXML": "F:\\Austin_Multimodal\\revised_austin_plans\\revised_austin_plans.xml",
 "networkXML":"F:\\Austin_Multimodal\\austin_multimodalnetwork\\austin_multimodalnetwork.xml",
 "ridesharing":"yes",
-"numvehicles":7500,
+"numvehicles":8750,
 "numtrips":10,
 "eventlimit":10000000,
 "runids":["kmean_rawtrips","kmean_nodeweight","async","async_congest","nopudo"],
 "clustercounts":["500","750","1000","1250","1500","1750","2000",""],
 "numpudos":7466,
 "runtimes":"20k 1k 14:45, 20k 2k, 20:06",
-"pudofile":"PUDOs_UCongest_asynccongest2500",
-"clusterfile":"clusterDict_asynccongest2500",
+"pudofile":"PUDOs_UCongest_asynccongest1500",
+"clusterfile":"clusterDict_asynccongest1500",
 "drop":1000,
-"runid":"csens7500_2500_rerun"
+"runid":"vsens8750_1500_rerun"
 }

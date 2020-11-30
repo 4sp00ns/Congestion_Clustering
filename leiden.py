@@ -13,7 +13,9 @@ Created on Sat Oct  3 15:20:26 2020
 #import matplotlib.pyplot as plt
 import networkx as nx
 from networkx import community as c
-
+from ATXxmlparse import getSDBNetworkTopo
+import pandas as pd
+from pudo_work import load_gtraffic
 #louv = community_louvain.best_partition(ATXnet)
 #louv_congest = community_louvain.best_partition(ATXcongest)
 
@@ -26,11 +28,36 @@ from networkx import community as c
 #    fft_list.append(edgeDict[e].get_duration())
 #    congest_list.append(edgeDict[e].get_congested_duration())
 #igraphATX = igraph.Graph(n=7466, edges=elist) #, edge_attrs={'weight':fft_list}) 
+global nodeDict, edgeDict
+(nodeDict, edgeDict) = getSDBNetworkTopo()
+def createNetwork():
+    print('building network')
+    global ATXnet, ATXcongest, ATXnet_undir, ATXcongest_undir, dynamic_net
+    load_gtraffic(edgeDict)
+    ATXnet = nx.DiGraph()
+    ATXnet_undir = nx.Graph()
+    ATXcongest = nx.DiGraph()
+    ATXcongest_undir = nx.Graph()
+    ATXnet.add_nodes_from(nodeDict.keys())
+    ATXcongest.add_nodes_from(nodeDict.keys())
+    for e in edgeDict.keys():
+        if e[0] != e[1]:
+            ATXnet.add_edge(e[0],e[1],weight=float(edgeDict[e].get_duration()))
+            ATXnet_undir.add_edge(e[0],e[1],weight=float(edgeDict[e].get_duration()))
+            try:
+                congested_dur = max([edgeDict[e].get_congested_duration(), edgeDict[e[::-1]].get_congested_duration()])
+            except:
+                congested_dur = edgeDict[e].get_congested_duration()
+            ATXcongest.add_edge(e[0],e[1],weight=float(edgeDict[e].get_congested_duration()))
+            ATXcongest_undir.add_edge(e[0],e[1],weight=float(congested_dur))
+    dynamic_net = ATXnet
+    #return ATXnet
+createNetwork()
 
-n_clusters = 3000
+n_clusters = 500
 #smallest_clique = 2
-asyn = c.asyn_fluidc(ATXnet_undir, 3000)
-asyn_congest = c.asyn_fluidc(ATXcongest_undir,3000)
+asyn = c.asyn_fluidc(ATXnet_undir, 500)
+asyn_congest = c.asyn_fluidc(ATXcongest_undir,500)
 ##kclq = list(c.k_clique_communities(ATXnet,3))
 ##kclq_congest = list(c.k_clique_communities(ATXcongest, 3))
 #

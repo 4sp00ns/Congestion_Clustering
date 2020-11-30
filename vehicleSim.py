@@ -425,7 +425,7 @@ def assignVehicle(ride, schedule): #,enrouteDict):
     return schedule
 def findNearestVehicle(ride, schedule):
     nearbyPUDOs = list(clusterPUDOs[nodeDict[ride.get_origin()].get_cluster()]) #[PUDOs[ride.get_oPUDO().get_ID()]]#
-    print('DEBUG CLUSTERPUDOS', nodeDict[ride.get_origin()].get_cluster(), clusterPUDOs[nodeDict[ride.get_origin()].get_cluster()])    
+    #print('DEBUG CLUSTERPUDOS', nodeDict[ride.get_origin()].get_cluster(), clusterPUDOs[nodeDict[ride.get_origin()].get_cluster()])    
     currlen = len(nearbyPUDOs)
     #print('cluster',nodeDict[ride.get_origin()].get_cluster(),'len nearbypudos',len(nearbyPUDOs))
     while max(list(map(lambda nearbyPUDOs: nearbyPUDOs.get_capacity(), nearbyPUDOs))) == 0:
@@ -541,6 +541,8 @@ def rideshareLogic(ride, schedule):
         #print('ROUTE DEBUG',route)
         vehicle_loc = route[0]
         finalCluster = nodeDict[str(route[-1:][0])].get_cluster()
+        pickedup = False
+        addtlpickup = ''
         for pos in range(len(route)-1):
             ###identify the approximate location of the vehicle###
             ###by stepping through the route and assessing the travel time for each step###
@@ -551,9 +553,13 @@ def rideshareLogic(ride, schedule):
                 ###shift the vehicles assumed location forward 1 node on its route###
                 vehicle_loc = route[pos]
             if timesum > elapsed:
+                if pickedup == False:
+                    addtlpickup = enroute.get_oPUDO().get_ID()
                 ###the evaluated node has not yet been reached by the vehicle###
                 ###add its adjacent clusters to our route cluster list###
                 adjClusters.append(nodeDict[str(route[pos])].get_cluster())
+            if str(vehicle_loc) == str(enroute.get_oPUDO().get_ID()):
+                pickedup = True
         adjClusters = list(set(adjClusters))
         try:
             adjClusters.pop(adjClusters.index(finalCluster))
@@ -574,13 +580,19 @@ def rideshareLogic(ride, schedule):
                     schedule.pop((enroute.get_arrival_time(),'Arrival',enroute.get_ID()))
                 
                 #calculate route diversion to pick up new rider
-                rideDiversion = shortestPath(vehicle_loc, ride.get_oPUDO().get_ID())
+                rd = shortestPath(vehicle_loc, ride.get_oPUDO().get_ID())
+                if addtlpickup != '':
+                    #still need to pick up original rider
+                    ogRiderDiversion = shortestPath(ride.get_oPUDO().get_ID(), addtlpickup)
+                    rideDiversion = (rd[0] + ogRiderDiversion[0][1:], rd[1]+ogRiderDiversion[1])
+                else:
+                    rideDiversion = rd
                 #calculate new route and route extension, depending on whom is dropped off first
                 if dCluster in adjClusters:
 #                    print('within curr rout')
                     #if the current route contains both origin and destination the rideshare is dropped first
                     #new rider pickup to new ride destination
-                    newRoute = shortestPath(ride.get_oPUDO().get_ID(), ride.get_dPUDO().get_ID())
+                    newRoute = shortestPath(rideDiversion[0][-1:][0], ride.get_dPUDO().get_ID())
                     #new ride destination to original route destination
                     rideExt = shortestPath(ride.get_dPUDO().get_ID(), route[-1:][0])
                     ride.arrival_time = ride.get_hail_time()+dt.timedelta(seconds = rideDiversion[1]+newRoute[1])
@@ -608,7 +620,7 @@ def rideshareLogic(ride, schedule):
                     #if the rideshare requires extending the current route the current rider is dropped first
                     
                     #new rider pickup to current route destination:
-                    newRoute = shortestPath(ride.get_oPUDO().get_ID(), route[-1:][0])
+                    newRoute = shortestPath(rideDiversion[0][-1:][0], route[-1:][0])
                     #print('DEBUG curr route completed', route[:route.index(vehicle_loc)])
                     #print('DEBUG diversion', rideDiversion)
                     #print('DEBUG newroute',newRoute)
@@ -698,7 +710,7 @@ def reallocateVehicles(schedule, currTime, relocnum):
             PUDOs[oPUDO].capacity -= 1 
             ride = Ride('reloc'+str(relocnum), currTime, oPUDO, dPUDO, PUDOs[oPUDO], PUDOs[dPUDO])
             (ride.route, traveltime) = shortestPath(oPUDO, dPUDO)
-            print('DEBUG realloc traveltime',traveltime, oPUDO, dPUDO)
+            #print('DEBUG realloc traveltime',traveltime, oPUDO, dPUDO)
             if traveltime == 0:
                 print(WTF)
             ride.arrival_time = currTime + dt.timedelta(seconds = traveltime)
@@ -769,7 +781,7 @@ def eventReport(event, write, runid, idle):
         idle_df = pd.DataFrame(idle, columns = ['time','vehicles_at_PUDOs','vehicles_enroute','vehicles reallocating','num_rideshares'])
         idle_df["minute"] = idle_df.time.dt.hour*60 + idle_df.time.dt.minute
         idle_df = idle_df.groupby(['minute']).mean()
-        idle_df.to_csv('REPORTING\\vreport_' + runid + '_v'+str(config["numvehicles"])+ '.csv')
+        idle_df.to_csv('REPORTING\\vreport_' + runid +'.csv')
         return reporting
     #if event.get_eType() in ['Ride','Arrival','Reallocation']
     obj = event.get_eObj()
@@ -862,7 +874,7 @@ def simMaster(configfile):
     #global config
     relocnum = 0
     config = getConfig(configfile)
-    runid = config["runid"]
+    runid = config["runid"] +"_rshare"
     print('runid', runid)
     print('ridesharing?', config["ridesharing"])
     #runid, ncluster = config["runids"][3], config["clustercounts"][6]
