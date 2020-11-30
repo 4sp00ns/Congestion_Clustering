@@ -13,9 +13,14 @@ Created on Sat Oct  3 15:20:26 2020
 #import matplotlib.pyplot as plt
 import networkx as nx
 from networkx import community as c
+<<<<<<< HEAD
 from ATXxmlparse import getSDBNetworkTopo
 import pandas as pd
 from pudo_work import load_gtraffic
+=======
+from vehicleSim import createNetwork
+from ATXxmlparse import getSDBNetworkTopo
+>>>>>>> 85a521200f22f4c998ffe1517a11691fea358330
 #louv = community_louvain.best_partition(ATXnet)
 #louv_congest = community_louvain.best_partition(ATXcongest)
 
@@ -54,10 +59,17 @@ def createNetwork():
     #return ATXnet
 createNetwork()
 
+<<<<<<< HEAD
 n_clusters = 500
 #smallest_clique = 2
 asyn = c.asyn_fluidc(ATXnet_undir, 500)
 asyn_congest = c.asyn_fluidc(ATXcongest_undir,500)
+=======
+n_clusters = 7466
+#smallest_clique = 2
+asyn = c.asyn_fluidc(ATXnet_undir, 7466)
+asyn_congest = c.asyn_fluidc(ATXcongest_undir,7466)
+>>>>>>> 85a521200f22f4c998ffe1517a11691fea358330
 ##kclq = list(c.k_clique_communities(ATXnet,3))
 ##kclq_congest = list(c.k_clique_communities(ATXcongest, 3))
 #
